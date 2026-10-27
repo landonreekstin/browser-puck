@@ -97,12 +97,16 @@ Follows the nixos-config companion-repo rule: the game is *packaged* there, neve
 
 - [x] `npm run build` produces a static client bundle + server entry
 - [x] Server also serves the static client (one process, one port)
-- [ ] `pkgs/browser-puck/default.nix` in nixos-config (`buildNpmPackage` + `fetchFromGitHub` pin) — **drafted in [DEPLOY.md](DEPLOY.md)**, test-built from a local checkout; not applied
-- [ ] `modules/nixos/homelab/browser-puck.nix` declaring `customConfig.homelab.browserPuck`
-      (systemd service, `DynamicUser`, port option) — enabled on **mini-server** — drafted in DEPLOY.md
-- [ ] nginx vhost `puck.lan` in `reverse-proxy-mini.nix` (`proxyWebsockets = true` is already set by `mkProxy`) — one line, in DEPLOY.md
-- [ ] `.lan` DNS entry; restricted WireGuard peers allowed to reach it (optiplex-fw pf)
-- [ ] Decide: VPN-only friends, or a public port forward (needs TLS + abuse thinking)
+- [x] `pkgs/browser-puck/default.nix` in nixos-config (`buildNpmPackage` + `fetchFromGitHub` pin)
+- [x] `modules/nixos/homelab/browser-puck.nix` declaring `customConfig.homelab.browserPuck`
+      (systemd service, `DynamicUser`, port option), enabled on **mini-server** (nixos-config PR #233)
+- [x] ~~nginx vhost `puck.lan`~~ replaced: restricted peers route only `192.168.1.76` and use
+      public DNS, so players use **`http://192.168.1.76:8787`**, redirected by optiplex-fw
+      (see [DEPLOY.md](DEPLOY.md))
+- [x] pf rules on optiplex-fw (wg0 for all VPN peers + re0 for the LAN), committed to
+      openbsd-dotfiles. The LAN path was verified with `verify:room`/`netcode`/`touch` against the
+      deployed server; the wg0 path mirrors the working Batman rule and still wants a friend to try it
+- [ ] Decide: stay VPN-only (current), or add a public port forward (needs TLS + abuse thinking)
 
 ## M7 — Later / ideas
 
