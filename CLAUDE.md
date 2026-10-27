@@ -43,6 +43,9 @@ before substantive changes.
   - `npm run verify:netcode` — with `dev` running: a lagged client (200±60 ms, 10% loss) plus
     a 60%-loss spectator; measures own-piece response vs server lag, prediction convergence,
     and the worst frame-to-frame puck jump
+  - `npm run verify:rules` — with `dev` running: 8 bots play a full match (up to 4 min) while
+    a browser spectates; checks shots, catches/dead-puck handoffs and goals keep happening and
+    the puck never lies dead longer than the rule allows
   - `npm run bot -- --room CODE --count N` (or `--create --count 8 --start`) — headless bot
     players; `--goalies` prefers goal slots, `--seconds N` exits after N s
 

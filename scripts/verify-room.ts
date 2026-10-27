@@ -74,19 +74,22 @@ try {
   await shot(alice, "02-playing-alice");
   await shot(bob, "03-playing-bob");
 
-  // Alice holds the puck at kickoff (provisional rule): slingshot it toward Bob's goal.
-  check((await data(alice, "held")) === "0", "Alice's goalie holds the puck at kickoff");
-  await moveTo(alice, { x: 600, y: 300 });
-  await alice.waitForTimeout(500);
-  await alice.mouse.down();
-  await moveTo(alice, { x: 400, y: 300 }, 15);
-  await alice.waitForTimeout(100);
-  await shot(alice, "04-alice-aiming");
-  await alice.mouse.up();
-  const bobSaw = await until(bob, "held", (v) => v !== "0", 2000);
-  check(bobSaw !== "0", "Bob's client sees Alice's shot leave her goalie (server-authoritative)");
-  await bob.waitForTimeout(200);
-  await shot(bob, "05-bob-sees-shot");
+  // Kickoff goes to a random team (DESIGN.md "Faceoff"); its goalie slingshots at the other goal.
+  const held = await data(alice, "held");
+  check(held === "0" || held === "1", `a goalie holds the puck at kickoff (team ${Number(held) + 1})`);
+  const [shooter, watcher] = held === "0" ? [alice, bob] : [bob, alice];
+  const dir = held === "0" ? 1 : -1;
+  await moveTo(shooter, { x: 600, y: 300 });
+  await shooter.waitForTimeout(500);
+  await shooter.mouse.down();
+  await moveTo(shooter, { x: 600 - 200 * dir, y: 300 }, 15);
+  await shooter.waitForTimeout(100);
+  await shot(shooter, "04-aiming");
+  await shooter.mouse.up();
+  const seen = await until(watcher, "held", (v) => v !== held, 2000);
+  check(seen !== held, "the other client sees the shot leave the goalie (server-authoritative)");
+  await watcher.waitForTimeout(200);
+  await shot(watcher, "05-other-client-sees-shot");
 
   // Reconnect: Bob reloads the page and lands back in his slot.
   await bob.reload();

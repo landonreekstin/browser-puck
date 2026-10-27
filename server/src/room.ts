@@ -59,6 +59,8 @@ export class Room {
     readonly code: string,
     private readonly cfg: Config,
     private readonly now: () => number,
+    /** Picks the first kickoff team (DESIGN.md "Faceoff"); the sim itself stays seeded. */
+    private readonly random: () => number = Math.random,
   ) {}
 
   /** Adds a player, or reattaches one presenting a known token. */
@@ -133,7 +135,7 @@ export class Room {
     const problem = this.startProblem();
     if (problem) return problem;
 
-    const world = createWorld(this.cfg, 0);
+    const world = createWorld(this.cfg, 0, this.random() < 0.5 ? 0 : 1);
     for (const s of this.occupiedSlots()) {
       if (s.kind === "blocker") addBlocker(world, this.cfg, s.team, s.index);
     }

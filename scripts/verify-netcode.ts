@@ -131,11 +131,15 @@ try {
   await alice.waitForTimeout(1200);
   await alice.keyboard.press("F3");
   await takeLog(alice);
-  await moveTo(alice, { x: 600, y: 300 });
-  await alice.waitForTimeout(800);
-  await alice.mouse.down();
-  await moveTo(alice, { x: 400, y: 340 }, 10);
-  await alice.mouse.up();
+  // Whoever holds the puck shoots (kickoff is random; it may have been caught or auto-shot
+  // since). Wait for a goalie to have it.
+  const held = await until(bob, "held", (v) => v === "0" || v === "1", 8000);
+  const [shooter, dir] = held === "0" ? [alice, 1] : [bob, -1];
+  await moveTo(shooter, { x: 600, y: 300 });
+  await shooter.waitForTimeout(800);
+  await shooter.mouse.down();
+  await moveTo(shooter, { x: 600 - 200 * dir, y: 340 }, 10);
+  await shooter.mouse.up();
   await alice.waitForTimeout(700);
   await alice.screenshot({ path: "screenshots/netcode-01-alice-lagged-debug.png" });
   await alice.waitForTimeout(1300);

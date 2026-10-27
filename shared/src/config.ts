@@ -66,6 +66,20 @@ export interface Config {
     /** Max predicted time (s). */
     seconds: number;
   };
+  /** Possession rules (DESIGN.md "Puck possession and flow"). 0 switches a rule off. */
+  rules: {
+    /** A puck slower than this inside a goalie box is caught by that goalie. */
+    catchSpeed: number;
+    /** A goalie holding the puck this long auto-launches it. */
+    shotTimerSeconds: number;
+    /** Power (0–1) of that auto-launch, straight at the other goal. */
+    autoLaunchPower: number;
+    /** A puck slower than this outside the boxes is "dead"… */
+    deadSpeed: number;
+    /** …and after this long goes to the goalie of the half it's in. */
+    deadPuckSeconds: number;
+  };
+  match: { goalsToWin: number };
   sandbox: { blockersPerTeam: number };
 }
 
@@ -81,6 +95,8 @@ export const defaultConfig: Config = {
   bar: { length: 120, thickness: 12, restitution: 0.95, moveSpeed: 700, rotateSpeed: 7 },
   launch: { maxSpeed: 1600, maxDrag: 220, minDrag: 15, powerExponent: 1 },
   aimPreview: { bounces: 1, seconds: 1.5 },
+  rules: { catchSpeed: 350, shotTimerSeconds: 5, autoLaunchPower: 0.35, deadSpeed: 40, deadPuckSeconds: 2 },
+  match: { goalsToWin: 5 },
   sandbox: { blockersPerTeam: 2 },
 };
 

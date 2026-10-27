@@ -7,6 +7,7 @@ export * from "./sim/collide";
 export * from "./sim/geometry";
 export * from "./sim/launch";
 export * from "./sim/preview";
+export * from "./sim/rules";
 export * from "./sim/slots";
 export * from "./sim/step";
 export * from "./sim/world";

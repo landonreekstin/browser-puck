@@ -128,6 +128,7 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
     d.held = String(world.puck.heldBy ?? "");
     d.puckSpeed = Math.hypot(world.puck.vel.x, world.puck.vel.y).toFixed(1);
     d.selected = piece.id;
+    d.winner = String(world.winner ?? "");
     requestAnimationFrame(frame);
   }
 

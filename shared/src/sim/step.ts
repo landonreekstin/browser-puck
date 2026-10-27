@@ -3,6 +3,7 @@ import { add, distance, lerp, length, scale, sub, type Vec } from "../vec";
 import { collideCapsule, type Hit } from "./collide";
 import { barSegment, clampBlockerTarget, clampGoalieTarget, rinkWalls } from "./geometry";
 import { launchVelocity, type Launch } from "./launch";
+import { possessionRules, shotTimer, type Possession } from "./rules";
 import { givePuck, goalieOf, type Blocker, type Goalie, type Team, type World } from "./world";
 
 /** What a player controls. Targets persist in the world until the next input changes them. */
@@ -27,6 +28,10 @@ export interface Contact {
 export interface StepEvents {
   contacts: Contact[];
   goal: { scoringTeam: Team; at: Vec } | null;
+  /** A goalie shot this tick (auto = the shot timer ran out). */
+  launched: { team: Team; auto: boolean } | null;
+  /** A goalie gained the puck by a catch or the dead-puck rule (goals report via `goal`). */
+  possession: Possession | null;
   substeps: number;
 }
 
@@ -39,9 +44,11 @@ export interface Pose {
 export function step(world: World, cfg: Config, inputs: Inputs): StepEvents {
   const dt = 1 / cfg.sim.tickRate;
   const puck = world.puck;
-  const events: StepEvents = { contacts: [], goal: null, substeps: 0 };
+  const events: StepEvents = { contacts: [], goal: null, launched: null, possession: null, substeps: 0 };
 
-  applyInputs(world, cfg, inputs);
+  if (world.winner !== null) inputs = withoutLaunches(inputs); // match over: puck stays put
+  const launcher = applyInputs(world, cfg, inputs);
+  if (launcher !== null) events.launched = { team: launcher, auto: false };
 
   // Where each piece starts and ends this tick; the puck sees them interpolated per substep.
   const goalieFrom: Pose[] = world.goalies.map((g) => ({ pos: g.pos, angle: 0 }));
@@ -61,10 +68,16 @@ export function step(world: World, cfg: Config, inputs: Inputs): StepEvents {
     });
   };
 
-  if (puck.heldBy !== null) {
+  if (world.winner !== null || puck.heldBy !== null) {
     setPoses(1);
-    puck.pos = { ...goalieOf(world, puck.heldBy).pos };
-    puck.vel = { x: 0, y: 0 };
+    if (puck.heldBy !== null) {
+      puck.pos = { ...goalieOf(world, puck.heldBy).pos };
+      puck.vel = { x: 0, y: 0 };
+      if (world.winner === null) {
+        const auto = shotTimer(world, cfg);
+        if (auto !== null) events.launched = { team: auto, auto: true };
+      }
+    }
     world.tick++;
     return events;
   }
@@ -98,8 +111,11 @@ export function step(world: World, cfg: Config, inputs: Inputs): StepEvents {
       events.goal = { scoringTeam, at: { ...puck.pos } };
       world.score[scoringTeam]++;
       setPoses(1);
-      // Provisional faceoff (DESIGN.md "Puck possession"): conceding goalie gets the puck.
+      // Faceoff (DESIGN.md "Puck possession"): the conceding goalie gets the puck.
       givePuck(world, scoringTeam === 0 ? 1 : 0);
+      if (cfg.match.goalsToWin > 0 && world.score[scoringTeam] >= cfg.match.goalsToWin) {
+        world.winner = scoringTeam;
+      }
       world.tick++;
       return events;
     }
@@ -109,11 +125,23 @@ export function step(world: World, cfg: Config, inputs: Inputs): StepEvents {
   world.puck.vel = scale(puck.vel, Math.exp(-cfg.puck.drag * dt));
   if (length(world.puck.vel) < cfg.puck.stopSpeed) world.puck.vel = { x: 0, y: 0 };
 
+  events.possession = possessionRules(world, cfg);
   world.tick++;
   return events;
 }
 
-function applyInputs(world: World, cfg: Config, inputs: Inputs): void {
+function withoutLaunches(inputs: Inputs): Inputs {
+  const out: Inputs = {};
+  for (const [id, input] of Object.entries(inputs)) {
+    const { launch: _, ...rest } = input;
+    out[id] = rest;
+  }
+  return out;
+}
+
+/** Applies targets and shots; returns the team whose goalie shot, if any. */
+function applyInputs(world: World, cfg: Config, inputs: Inputs): Team | null {
+  let launcher: Team | null = null;
   for (const g of world.goalies) {
     const input = inputs[g.id];
     if (!input) continue;
@@ -122,12 +150,15 @@ function applyInputs(world: World, cfg: Config, inputs: Inputs): void {
       world.puck.vel = launchVelocity(input.launch, cfg);
       world.puck.heldBy = null;
       world.puck.passThroughGoalie = g.team;
+      world.puck.heldTicks = 0;
+      launcher = g.team;
     }
   }
   for (const b of world.blockers) {
     const input = inputs[b.id];
     if (input) setBlockerTarget(b, cfg, input);
   }
+  return launcher;
 }
 
 // Piece motion is kinematic (pieces never get pushed), so it depends only on a piece's own
