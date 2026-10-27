@@ -53,8 +53,19 @@ opposing goal.
   a dead puck at bar speed but can never shoot it. If that turns out to be exploitable,
   M3's dead-puck rule handles it.
 - Goalies body-block the same way: a reflection that never adds speed.
-- Controls (proposal): mouse position = bar position target, scroll wheel or Q/E = rotate;
-  WASD alternative. Touch scheme **(open)**.
+- Controls (built): mouse position = bar position target, scroll wheel or Q/E = rotate. The
+  WASD alternative isn't built.
+
+### Touch controls (M5, proposed by Claude, pending review)
+
+Touch has no hover, so pieces move only while a finger is down and stay put on release.
+
+- **Goalie:** a touch that starts on or near your goalie (within 2.5 goalie radii) drags it
+  around the box. A touch that starts anywhere else is the slingshot: pull back, release
+  to shoot, and drag back to near the start point to cancel.
+- **Blocker:** one finger drags the bar. A second finger twisting around the first rotates
+  it. On-screen ⟲ ⟳ buttons (shown on touch screens for blockers) rotate while held, for
+  one-handed play.
 
 ## Puck possession and flow (M3)
 

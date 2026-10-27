@@ -4,16 +4,19 @@ import {
   predictPath,
   Predictor,
   slotInfo,
+  type GameEvent,
   type RoomState,
   type TickInput,
   type Vec,
   type World,
 } from "@puck/shared";
 import { Controls } from "./controls";
+import { Effects } from "./effects";
 import { Lobby } from "./lobby";
 import type { Net } from "./net";
 import { fitCanvas, render } from "./render";
 import { SnapshotBuffer } from "./snapshots";
+import { Sfx } from "./sound";
 import { View } from "./view";
 
 // Browser storage is a convenience only: it can be missing or throw.
@@ -43,6 +46,10 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
   const controls = new Controls(canvas, view, () => cfg);
   const snapshots = new SnapshotBuffer(cfg);
   const predictor = new Predictor(cfg);
+  const effects = new Effects(cfg);
+  const sfx = new Sfx();
+  /** Events from snapshots, played when their tick is rendered (so they match the picture). */
+  let events: GameEvent[] = [];
   let seq = 0;
   let batch: TickInput[] = [];
 
@@ -100,7 +107,10 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
       case "room": {
         const wasPlaying = room?.phase === "playing";
         room = msg.room;
-        if (room.phase === "playing" && !wasPlaying) snapshots.reset();
+        if (room.phase === "playing" && !wasPlaying) {
+          snapshots.reset();
+          events = [];
+        }
         const before = controls.piece?.id;
         if (me) lobby.renderRoom(room, me.playerId);
         const slot = room.players.find((p) => p.id === me?.playerId)?.slot ?? null;
@@ -111,6 +121,8 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
       }
       case "snapshot":
         snapshots.push(msg.world);
+        events.push(...msg.events);
+        if (events.length > 300) events.splice(0, events.length - 300);
         if (controls.piece) predictor.reconcile(msg.world, controls.piece.id, msg.acks[controls.piece.id]);
         break;
       case "error":
@@ -180,6 +192,12 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
     const world = sampled ? withPrediction(sampled) : undefined;
     rendered = world;
     if (world) {
+      while (events[0] && events[0].tick <= snapshots.renderTick) {
+        const e = events.shift()!;
+        effects.event(e, world);
+        sfx.play(e);
+      }
+      effects.update(elapsed, world);
       const piece = controls.piece;
       const launch = controls.currentLaunch();
       // Aim preview from the newest snapshot, with our goalie (and held puck) where we see it.
@@ -192,6 +210,7 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
         cfg,
         view,
         world,
+        effects,
         selectedId: piece?.id ?? "",
         aim:
           piece?.kind === "goalie" && controls.dragStart
@@ -210,7 +229,7 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
           : null,
         goalFlash: 0,
         labels,
-        help: `room ${room?.code ?? ""} · mouse move · drag shoot (goalie) · wheel/Q/E rotate (bar) · F3 debug`,
+        help: `room ${room?.code ?? ""} · mouse move · drag shoot (goalie) · wheel/Q/E rotate (bar) · F3 debug · M sound ${sfx.isMuted ? "off" : "on"}`,
       });
     } else {
       ctx.fillStyle = "#111418";
@@ -229,6 +248,7 @@ export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: st
     d.score = latest ? latest.score.join("-") : "";
     d.held = latest ? String(latest.puck.heldBy ?? "") : "";
     d.extrapolating = snapshots.extrapolatingTicks.toFixed(2);
+    d.sounds = String(sfx.played);
     d.puckSpeed = latest ? Math.hypot(latest.puck.vel.x, latest.puck.vel.y).toFixed(1) : "";
     requestAnimationFrame(frame);
   }

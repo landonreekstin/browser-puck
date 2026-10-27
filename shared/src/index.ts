@@ -1,4 +1,5 @@
 export * from "./config";
+export * from "./events";
 export * from "./predict";
 export * from "./protocol";
 export * from "./rng";

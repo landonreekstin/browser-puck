@@ -17,6 +17,8 @@ export class SnapshotBuffer {
   private extrapolated: World[] = [];
   /** For the debug overlay: ticks we're currently extrapolating past the newest snapshot. */
   extrapolatingTicks = 0;
+  /** The (fractional) server tick the last sample() showed; events up to it are due. */
+  renderTick = -Infinity;
 
   constructor(private readonly cfg: Config) {}
 
@@ -35,6 +37,7 @@ export class SnapshotBuffer {
     this.snaps = [];
     this.extrapolated = [];
     this.clock = null;
+    this.renderTick = -Infinity;
   }
 
   latest(): World | undefined {
@@ -54,6 +57,7 @@ export class SnapshotBuffer {
     }
 
     const renderTick = this.clock - (this.cfg.net.interpDelayMs / 1000) * rate;
+    this.renderTick = renderTick;
     const first = this.snaps[0]!;
     this.extrapolatingTicks = 0;
     if (renderTick <= first.tick) return first;

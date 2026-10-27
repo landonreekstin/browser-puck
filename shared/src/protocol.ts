@@ -1,6 +1,7 @@
 // Wire messages between client and server (JSON). Clients send intents and inputs only —
 // never positions or puck state (CLAUDE.md rule 1). Everything a client sends is validated.
 
+import type { GameEvent } from "./events";
 import type { SlotId } from "./sim/slots";
 import type { PieceInput } from "./sim/step";
 import type { World } from "./sim/world";
@@ -40,7 +41,7 @@ export type ServerMessage =
   | { t: "welcome"; room: string; playerId: string; token: string }
   | { t: "room"; room: RoomState }
   /** acks: slot → seq of the last input the server applied for that slot's player. */
-  | { t: "snapshot"; world: World; acks: Record<string, number> }
+  | { t: "snapshot"; world: World; acks: Record<string, number>; events: GameEvent[] }
   | { t: "error"; message: string };
 
 export function encode(msg: ClientMessage | ServerMessage): string {

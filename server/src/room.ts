@@ -4,11 +4,13 @@ import {
   allSlots,
   cloneWorld,
   createWorld,
+  eventsFromStep,
   removeBlocker,
   slotInfo,
   startProblem,
   step,
   type Config,
+  type GameEvent,
   type Inputs,
   type PieceInput,
   type RoomState,
@@ -52,6 +54,8 @@ export class Room {
   world: World | null = null;
 
   private nextPlayerId = 1;
+  /** Effects-worthy events since the last snapshot. */
+  private pendingEvents: GameEvent[] = [];
   private lastTickAt = 0;
   private ticksSinceSnapshot = 0;
 
@@ -239,7 +243,8 @@ export class Room {
       }
       inputs[p.slot] = input;
     }
-    step(world, this.cfg, inputs);
+    const events = step(world, this.cfg, inputs);
+    this.pendingEvents.push(...eventsFromStep(world.tick, events));
   }
 
   private snapshot(): ServerMessage {
@@ -247,7 +252,9 @@ export class Room {
     for (const p of this.players.values()) {
       if (p.slot !== null && p.ackSeq >= 0) acks[p.slot] = p.ackSeq;
     }
-    return { t: "snapshot", world: this.world!, acks };
+    const events = this.pendingEvents;
+    this.pendingEvents = [];
+    return { t: "snapshot", world: this.world!, acks, events };
   }
 
   private occupiedSlots(): ReturnType<typeof allSlots> {
