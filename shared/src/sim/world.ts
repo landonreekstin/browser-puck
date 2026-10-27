@@ -37,10 +37,13 @@ export interface World {
   score: [number, number];
 }
 
-/** Starting layout: goalies centred in their boxes, bars spread across each half, puck with team 0. */
-export function createWorld(cfg: Config): World {
+/**
+ * Starting layout: goalies centred in their boxes, `blockersPerTeam` bars spread across
+ * each half, puck with team 0.
+ */
+export function createWorld(cfg: Config, blockersPerTeam = cfg.sandbox.blockersPerTeam): World {
   const { width: w, height: h } = cfg.rink;
-  const n = cfg.sandbox.blockersPerTeam;
+  const n = blockersPerTeam;
   const goalies: Goalie[] = [];
   const blockers: Blocker[] = [];
 
@@ -48,17 +51,7 @@ export function createWorld(cfg: Config): World {
     const box = goalieBox(cfg, team);
     const gp = { x: (box.minX + box.maxX) / 2, y: h / 2 };
     goalies.push({ id: `t${team}-goalie`, team, pos: gp, target: { ...gp } });
-    for (let i = 0; i < n; i++) {
-      const bp = { x: team === 0 ? w * 0.3 : w * 0.7, y: (h * (i + 1)) / (n + 1) };
-      blockers.push({
-        id: `t${team}-b${i}`,
-        team,
-        pos: bp,
-        angle: Math.PI / 2,
-        target: { ...bp },
-        targetAngle: Math.PI / 2,
-      });
-    }
+    for (let i = 0; i < n; i++) blockers.push(newBlocker(cfg, team, i, n));
   }
 
   const world: World = {
@@ -70,6 +63,30 @@ export function createWorld(cfg: Config): World {
   };
   givePuck(world, 0);
   return world;
+}
+
+/** A bar at its home position: slot `index` of `count`, spread across the team's half. */
+function newBlocker(cfg: Config, team: Team, index: number, count: number): Blocker {
+  const { width: w, height: h } = cfg.rink;
+  const pos = { x: team === 0 ? w * 0.3 : w * 0.7, y: (h * (index + 1)) / (count + 1) };
+  return {
+    id: `t${team}-b${index}`,
+    team,
+    pos,
+    angle: Math.PI / 2,
+    target: { ...pos },
+    targetAngle: Math.PI / 2,
+  };
+}
+
+/** Adds the bar for a blocker slot (drop-in), laid out over `room.maxBlockersPerTeam` slots. */
+export function addBlocker(world: World, cfg: Config, team: Team, index: number): void {
+  const bar = newBlocker(cfg, team, index, cfg.room.maxBlockersPerTeam);
+  if (!world.blockers.some((b) => b.id === bar.id)) world.blockers.push(bar);
+}
+
+export function removeBlocker(world: World, id: string): void {
+  world.blockers = world.blockers.filter((b) => b.id !== id);
 }
 
 export function goalieOf(world: World, team: Team): Goalie {

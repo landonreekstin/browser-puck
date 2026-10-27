@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts"
+    "dev": "tsx watch src/main.ts",
+    "bot": "tsx src/bot.ts"
   },
   "dependencies": {
     "@puck/shared": "*",

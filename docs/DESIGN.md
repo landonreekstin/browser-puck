@@ -79,9 +79,26 @@ goal), plus a sandbox key that hands the puck to a goalie. M3 replaces this.
 
 ## Teams and lobby
 
-- 4–8 players, two teams, roughly balanced. One goalie per team; goalie role picked or
-  rotated each goal **(open)**.
+- 4–8 players, two teams, roughly balanced. One goalie per team. In M2 the goalie role is
+  **picked in the lobby** like any other slot. Rotating it each goal stays **(open)** for M3.
 - Rooms joined by short code / link. No accounts.
+
+### Rooms and slots (M2)
+
+- A room has a 4-letter **code**; the invite link is `…/?room=CODE`. The first player to
+  join is the **host**. If the host leaves, the next connected player becomes host.
+- Each team has fixed **slots**: one goalie and up to three blockers (`t0-goalie`,
+  `t0-b0`…`t0-b2`, same for `t1`). A player holds at most one slot, or none (spectator).
+  The server enforces one player per slot, so there is one goalie per team.
+- **Start** (host only) needs each team to have 2–4 players: a goalie plus at least one
+  blocker. That gives the 4-player minimum.
+- **During a match** players can still take a free slot (drop-in). A blocker that joins
+  appears at its slot's home position. Leaving a blocker slot removes that bar.
+- **Disconnect:** your slot and piece are kept (the piece just stops) for
+  `room.reconnectGraceSeconds`. Rejoining with the same browser (it keeps a per-room token)
+  puts you back in your slot. After the grace period your slot frees up. An unoccupied
+  goalie holding the puck keeps it until someone takes the slot (M3's shot timer fixes this).
+- The host can end the match, which returns everyone to the lobby (score reset).
 
 ## Tuning knobs (to live in one shared config file)
 

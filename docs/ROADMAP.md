@@ -44,13 +44,18 @@ Sandbox controls: `1`–`6`/Tab select a piece · mouse = move target · drag = 
 
 ## M2 — Multiplayer core
 
-- [ ] Rooms with join codes/links; lobby: pick name, team, role
-- [ ] 4–8 players, exactly one goalie per team enforced server-side
-- [ ] Server runs the authoritative sim; clients send inputs only
-- [ ] Snapshots at 20–30 Hz; client interpolates remote entities
-- [ ] Headless bot client (Node) that joins and plays randomly — used for load and
+- [x] Rooms with join codes/links; lobby: pick name, team, role
+- [x] 4–8 players, exactly one goalie per team enforced server-side
+- [x] Server runs the authoritative sim; clients send inputs only
+- [x] Snapshots at 20–30 Hz; client interpolates remote entities
+- [x] Headless bot client (Node) that joins and plays randomly — used for load and
       regression testing with 8 players
-- [ ] Disconnect/reconnect keeps your slot
+- [x] Disconnect/reconnect keeps your slot
+
+Play: `npm run dev`, open http://localhost:5173, create a room, share the link. The offline
+sandbox moved to `/?sandbox`. Fill seats with `npm run bot -- --room CODE --count 6`. In M2
+your own piece is drawn from server snapshots too (about 100 ms + RTT behind your mouse); M4
+adds prediction.
 
 ## M3 — Rules and match flow
 
