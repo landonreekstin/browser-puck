@@ -3,7 +3,7 @@ import { add, distance, lerp, length, scale, sub, type Vec } from "../vec";
 import { collideCapsule, type Hit } from "./collide";
 import { barSegment, clampBlockerTarget, clampGoalieTarget, rinkWalls } from "./geometry";
 import { launchVelocity, type Launch } from "./launch";
-import { givePuck, goalieOf, type Team, type World } from "./world";
+import { givePuck, goalieOf, type Blocker, type Goalie, type Team, type World } from "./world";
 
 /** What a player controls. Targets persist in the world until the next input changes them. */
 export interface PieceInput {
@@ -30,7 +30,7 @@ export interface StepEvents {
   substeps: number;
 }
 
-interface Pose {
+export interface Pose {
   pos: Vec;
   angle: number;
 }
@@ -45,15 +45,9 @@ export function step(world: World, cfg: Config, inputs: Inputs): StepEvents {
 
   // Where each piece starts and ends this tick; the puck sees them interpolated per substep.
   const goalieFrom: Pose[] = world.goalies.map((g) => ({ pos: g.pos, angle: 0 }));
-  const goalieTo: Pose[] = world.goalies.map((g) => ({
-    pos: moveToward(g.pos, g.target, cfg.goalie.moveSpeed * dt),
-    angle: 0,
-  }));
+  const goalieTo: Pose[] = world.goalies.map((g) => ({ pos: nextGoaliePos(g, cfg, dt), angle: 0 }));
   const barFrom: Pose[] = world.blockers.map((b) => ({ pos: b.pos, angle: b.angle }));
-  const barTo: Pose[] = world.blockers.map((b) => ({
-    pos: moveToward(b.pos, b.target, cfg.bar.moveSpeed * dt),
-    angle: b.angle + clampAbs(angleDiff(b.angle, b.targetAngle), cfg.bar.rotateSpeed * dt),
-  }));
+  const barTo: Pose[] = world.blockers.map((b) => nextBlockerPose(b, cfg, dt));
 
   const setPoses = (t: number): void => {
     world.goalies.forEach((g, i) => {
@@ -123,9 +117,7 @@ function applyInputs(world: World, cfg: Config, inputs: Inputs): void {
   for (const g of world.goalies) {
     const input = inputs[g.id];
     if (!input) continue;
-    if (input.target && isFiniteVec(input.target)) {
-      g.target = clampGoalieTarget(cfg, g.team, input.target);
-    }
+    setGoalieTarget(g, cfg, input);
     if (input.launch && world.puck.heldBy === g.team) {
       world.puck.vel = launchVelocity(input.launch, cfg);
       world.puck.heldBy = null;
@@ -134,14 +126,31 @@ function applyInputs(world: World, cfg: Config, inputs: Inputs): void {
   }
   for (const b of world.blockers) {
     const input = inputs[b.id];
-    if (!input) continue;
-    if (input.target && isFiniteVec(input.target)) {
-      b.target = clampBlockerTarget(cfg, b.team, input.target);
-    }
-    if (input.targetAngle !== undefined && Number.isFinite(input.targetAngle)) {
-      b.targetAngle = input.targetAngle;
-    }
+    if (input) setBlockerTarget(b, cfg, input);
   }
+}
+
+// Piece motion is kinematic (pieces never get pushed), so it depends only on a piece's own
+// inputs. These are exported so the client can predict its own piece with the same code (M4).
+
+export function setGoalieTarget(g: Goalie, cfg: Config, input: PieceInput): void {
+  if (input.target && isFiniteVec(input.target)) g.target = clampGoalieTarget(cfg, g.team, input.target);
+}
+
+export function setBlockerTarget(b: Blocker, cfg: Config, input: PieceInput): void {
+  if (input.target && isFiniteVec(input.target)) b.target = clampBlockerTarget(cfg, b.team, input.target);
+  if (input.targetAngle !== undefined && Number.isFinite(input.targetAngle)) b.targetAngle = input.targetAngle;
+}
+
+export function nextGoaliePos(g: Goalie, cfg: Config, dt: number): Vec {
+  return moveToward(g.pos, g.target, cfg.goalie.moveSpeed * dt);
+}
+
+export function nextBlockerPose(b: Blocker, cfg: Config, dt: number): Pose {
+  return {
+    pos: moveToward(b.pos, b.target, cfg.bar.moveSpeed * dt),
+    angle: b.angle + clampAbs(angleDiff(b.angle, b.targetAngle), cfg.bar.rotateSpeed * dt),
+  };
 }
 
 function resolveCollisions(

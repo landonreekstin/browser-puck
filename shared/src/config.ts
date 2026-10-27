@@ -13,6 +13,10 @@ export interface Config {
     inputRate: number;
     /** How far behind the newest snapshot remote pieces are rendered. */
     interpDelayMs: number;
+    /** Server-side per-player input queue; beyond this, queued inputs are merged (catch-up). */
+    maxInputQueue: number;
+    /** When snapshots stop arriving, the client runs the sim forward at most this long. */
+    maxExtrapolateMs: number;
   };
   room: {
     maxBlockersPerTeam: number;
@@ -66,7 +70,7 @@ export interface Config {
 }
 
 export const defaultConfig: Config = {
-  net: { port: 8787, pingIntervalMs: 1000, snapshotRate: 30, inputRate: 30, interpDelayMs: 100 },
+  net: { port: 8787, pingIntervalMs: 1000, snapshotRate: 30, inputRate: 30, interpDelayMs: 100, maxInputQueue: 4, maxExtrapolateMs: 250 },
   room: { maxBlockersPerTeam: 3, reconnectGraceSeconds: 120, nameMaxLength: 16 },
   sim: { tickRate: 60, substepTravel: 0.5, maxSubsteps: 64 },
   rink: { width: 1200, height: 600, wallRestitution: 0.9 },

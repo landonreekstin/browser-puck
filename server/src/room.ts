@@ -10,11 +10,11 @@ import {
   step,
   type Config,
   type Inputs,
-  type Launch,
   type PieceInput,
   type RoomState,
   type ServerMessage,
   type SlotId,
+  type TickInput,
   type World,
 } from "@puck/shared";
 
@@ -31,10 +31,14 @@ interface Player {
   conn: Conn | null;
   /** ms timestamp of the disconnect, while disconnected. */
   disconnectedAt: number | null;
-  /** Latest target pose; persists until the next input. */
-  input: PieceInput;
-  /** Shots are one-shot: consumed by the next tick. */
-  launch: Launch | null;
+  /** Targets currently in effect; they persist until a newer input changes them. */
+  current: PieceInput;
+  /** Per-tick inputs not yet applied, oldest first (one is consumed per sim tick). */
+  queue: TickInput[];
+  /** Highest seq received, to drop duplicates. Reset when the client reconnects. */
+  lastQueuedSeq: number;
+  /** Seq of the last input applied; echoed in snapshots so the client can reconcile. */
+  ackSeq: number;
 }
 
 /**
@@ -65,6 +69,10 @@ export class Room {
       player.conn = conn;
       player.disconnectedAt = null;
       player.name = name;
+      // A reloaded client restarts its seq counter.
+      player.queue = [];
+      player.lastQueuedSeq = -1;
+      player.ackSeq = -1;
     } else {
       player = {
         id: `p${this.nextPlayerId++}`,
@@ -73,15 +81,17 @@ export class Room {
         slot: null,
         conn,
         disconnectedAt: null,
-        input: {},
-        launch: null,
+        current: {},
+        queue: [],
+        lastQueuedSeq: -1,
+        ackSeq: -1,
       };
       this.players.set(player.id, player);
     }
     this.hostId ??= player.id;
     conn.send({ t: "welcome", room: this.code, playerId: player.id, token: player.token });
     this.broadcastRoom();
-    if (this.world) conn.send({ t: "snapshot", world: this.world });
+    if (this.world) conn.send(this.snapshot());
     return player;
   }
 
@@ -91,8 +101,7 @@ export class Room {
     if (!p || p.conn !== conn) return; // a newer connection already took over
     p.conn = null;
     p.disconnectedAt = this.now();
-    p.input = {};
-    p.launch = null;
+    p.queue = [];
     this.reassignHost();
     this.broadcastRoom();
   }
@@ -133,11 +142,11 @@ export class Room {
     this.lastTickAt = this.now();
     this.ticksSinceSnapshot = 0;
     for (const p of this.players.values()) {
-      p.input = {};
-      p.launch = null;
+      p.current = {};
+      p.queue = [];
     }
     this.broadcastRoom();
-    this.broadcast({ t: "snapshot", world });
+    this.broadcast(this.snapshot());
     return null;
   }
 
@@ -149,13 +158,18 @@ export class Room {
     return null;
   }
 
-  /** A player's input applies only to their own piece; everything else is ignored. */
-  input(playerId: string, input: PieceInput): void {
+  /**
+   * Queues a client's per-tick inputs. They only ever drive that player's own piece; the
+   * sim clamps and rate-limits whatever they ask for.
+   */
+  input(playerId: string, inputs: TickInput[]): void {
     const p = this.players.get(playerId);
     if (!p || p.slot === null) return;
-    if (input.target) p.input.target = input.target;
-    if (input.targetAngle !== undefined) p.input.targetAngle = input.targetAngle;
-    if (input.launch) p.launch = input.launch;
+    for (const entry of inputs) {
+      if (entry.seq <= p.lastQueuedSeq) continue;
+      p.queue.push(entry);
+      p.lastQueuedSeq = entry.seq;
+    }
   }
 
   /** Runs due ticks, sends snapshots, expires disconnected players. */
@@ -173,7 +187,7 @@ export class Room {
       this.tick();
       if (++this.ticksSinceSnapshot >= snapshotEvery) {
         this.ticksSinceSnapshot = 0;
-        this.broadcast({ t: "snapshot", world: this.world });
+        this.broadcast(this.snapshot());
       }
     }
   }
@@ -207,12 +221,31 @@ export class Room {
     const inputs: Inputs = {};
     for (const p of this.players.values()) {
       if (p.slot === null) continue;
-      const input: PieceInput = { ...p.input };
-      if (p.launch) input.launch = p.launch;
-      p.launch = null;
+      // One queued input per tick, like the client applied them. If the queue has backed
+      // up (jitter, a backgrounded tab), merge the excess so latency doesn't build up.
+      const due: TickInput[] = [];
+      const first = p.queue.shift();
+      if (first) due.push(first);
+      while (p.queue.length > this.cfg.net.maxInputQueue) due.push(p.queue.shift()!);
+
+      const input: PieceInput = { ...p.current };
+      for (const { seq, input: next } of due) {
+        if (next.target) p.current.target = input.target = next.target;
+        if (next.targetAngle !== undefined) p.current.targetAngle = input.targetAngle = next.targetAngle;
+        if (next.launch) input.launch = next.launch;
+        p.ackSeq = seq;
+      }
       inputs[p.slot] = input;
     }
     step(world, this.cfg, inputs);
+  }
+
+  private snapshot(): ServerMessage {
+    const acks: Record<string, number> = {};
+    for (const p of this.players.values()) {
+      if (p.slot !== null && p.ackSeq >= 0) acks[p.slot] = p.ackSeq;
+    }
+    return { t: "snapshot", world: this.world!, acks };
   }
 
   private occupiedSlots(): ReturnType<typeof allSlots> {
@@ -224,8 +257,8 @@ export class Room {
     const info = p.slot === null ? undefined : slotInfo(this.cfg, p.slot);
     if (this.world && info?.kind === "blocker") removeBlocker(this.world, info.id);
     p.slot = null;
-    p.input = {};
-    p.launch = null;
+    p.current = {};
+    p.queue = [];
   }
 
   private expireDisconnected(): void {

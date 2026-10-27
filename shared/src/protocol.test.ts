@@ -11,8 +11,8 @@ describe("protocol", () => {
       { t: "pickSlot", slot: null },
       { t: "start" },
       { t: "stop" },
-      { t: "input", input: { target: { x: 1, y: 2 }, targetAngle: 0.5, launch: { angle: 1, power: 0.5 } } },
-      { t: "input", input: {} },
+      { t: "input", inputs: [{ seq: 1, input: { target: { x: 1, y: 2 }, targetAngle: 0.5, launch: { angle: 1, power: 0.5 } } }] },
+      { t: "input", inputs: [{ seq: 2, input: {} }, { seq: 3, input: {} }] },
     ];
     for (const m of msgs) expect(decodeClientMessage(encode(m))).toEqual(m);
   });
@@ -30,9 +30,11 @@ describe("protocol", () => {
       JSON.stringify({ t: "ping", id: "x", clientTime: 1 }),
       JSON.stringify({ t: "join", room: 5, name: "a" }),
       JSON.stringify({ t: "join", room: null, name: "x".repeat(500) }),
-      JSON.stringify({ t: "input", input: { target: { x: "1", y: 2 } } }),
-      JSON.stringify({ t: "input", input: { launch: { angle: 1 } } }),
-      JSON.stringify({ t: "input", input: { targetAngle: null } }),
+      JSON.stringify({ t: "input", inputs: [{ seq: 1, input: { target: { x: "1", y: 2 } } }] }),
+      JSON.stringify({ t: "input", inputs: [{ seq: 1, input: { launch: { angle: 1 } } }] }),
+      JSON.stringify({ t: "input", inputs: [{ seq: 1, input: { targetAngle: null } }] }),
+      JSON.stringify({ t: "input", inputs: [{ input: {} }] }),
+      JSON.stringify({ t: "input", inputs: Array.from({ length: 17 }, (_, i) => ({ seq: i, input: {} })) }),
       JSON.stringify({ t: "snapshot", world: {} }),
       encode({ t: "pong", id: 1, clientTime: 1 }),
     ];
@@ -42,7 +44,7 @@ describe("protocol", () => {
   });
 
   it("drops unknown fields from inputs (clients can't smuggle state)", () => {
-    const raw = JSON.stringify({ t: "input", input: { target: { x: 1, y: 2, z: 3 }, pos: { x: 0, y: 0 } } });
-    expect(decodeClientMessage(raw)).toEqual({ t: "input", input: { target: { x: 1, y: 2 } } });
+    const raw = JSON.stringify({ t: "input", inputs: [{ seq: 1, input: { target: { x: 1, y: 2, z: 3 }, pos: { x: 0, y: 0 } } }] });
+    expect(decodeClientMessage(raw)).toEqual({ t: "input", inputs: [{ seq: 1, input: { target: { x: 1, y: 2 } } }] });
   });
 });

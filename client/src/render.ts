@@ -34,7 +34,13 @@ export interface Frame {
   selectedId: string;
   /** Set while the selected goalie is aiming. */
   aim: { launch: Launch | null; path: Vec[] } | null;
-  debug: { contacts: { contact: Contact; age: number }[]; fps: number; substeps: number; net: string } | null;
+  debug: {
+    contacts: { contact: Contact; age: number }[];
+    fps: number;
+    substeps: number;
+    net: string;
+    lines?: string[];
+  } | null;
   goalFlash: number;
   /** Name tags drawn above pieces, keyed by piece id. */
   labels: Record<string, string>;
@@ -250,6 +256,7 @@ function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, f
       `fps ${f.debug.fps.toFixed(0)}   tick ${world.tick}   substeps ${f.debug.substeps}`,
       `puck ${length(vel).toFixed(0)} u/s  (${vel.x.toFixed(0)}, ${vel.y.toFixed(0)})  held: ${world.puck.heldBy ?? "-"}`,
       `server ${f.debug.net}`,
+      ...(f.debug.lines ?? []),
     ];
     ctx.fillStyle = colors.debug;
     lines.forEach((l, i) => ctx.fillText(l, 12, 12 + i * 16));

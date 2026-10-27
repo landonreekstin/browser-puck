@@ -49,7 +49,7 @@ wss.on("connection", (socket, req) => {
       case "stop":
         return fail(room.stop(playerId));
       case "input":
-        return room.input(playerId, msg.input);
+        return room.input(playerId, msg.inputs);
     }
   });
 

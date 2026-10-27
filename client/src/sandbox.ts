@@ -75,7 +75,8 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
   function tick(): void {
     const dt = 1 / cfg.sim.tickRate;
     prev = cloneWorld(world);
-    const input = controls.collect(dt, world);
+    const bar = world.blockers.find((b) => b.id === controls.piece?.id);
+    const input = controls.collect(dt, bar ? bar.angle : null);
     const events = step(world, cfg, input && controls.piece ? { [controls.piece.id]: input } : {});
     lastSubsteps = events.substeps;
     for (const contact of events.contacts) contacts.push({ contact, age: 0 });

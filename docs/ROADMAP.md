@@ -66,10 +66,23 @@ adds prediction.
 
 ## M4 — Netcode feel
 
-- [ ] Client-side prediction for your own bar/goalie aim (no input lag on your own piece)
-- [ ] Reconciliation on server correction
-- [ ] Test with artificial latency/jitter (e.g. 100 ms ± 30) via a dev flag
-- [ ] Puck rendering stays smooth under packet loss
+- [x] Client-side prediction for your own bar/goalie aim (no input lag on your own piece)
+- [x] Reconciliation on server correction
+- [x] Test with artificial latency/jitter (e.g. 100 ms ± 30) via a dev flag
+- [x] Puck rendering stays smooth under packet loss
+
+How it works: the client sends one input per sim tick (seq-numbered, batched at
+`net.inputRate`). The server consumes one per tick, merging any backlog beyond
+`net.maxInputQueue`, and acks the last applied seq per slot in each snapshot. `Predictor`
+(`shared/src/predict.ts`) replays unacked inputs on the server's copy of your piece with the
+sim's own motion code. Pieces are kinematic, so steady latency gives an exact match (tested
+against the real `Room`), and jitter corrections get blended out. Remote pieces and the puck
+render `net.interpDelayMs` behind. When snapshots run out, the client runs the sim forward
+(up to `net.maxExtrapolateMs`). The puck itself is not predicted: after you shoot, it leaves
+your goalie one RTT later.
+
+Dev flag: `?lag=200&jitter=60&loss=0.1` (added RTT ms, ± ms per message with order kept,
+fraction of snapshots dropped). The debug overlay (F3) shows the correction and extrapolation.
 
 ## M5 — Presentation
 

@@ -1,24 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig, length, type ServerMessage } from "@puck/shared";
+import { createRng, defaultConfig, length, Predictor, type PieceInput, type ServerMessage, type TickInput } from "@puck/shared";
 import { Room, type Conn } from "./room";
 
 class FakeConn implements Conn {
   readonly sent: ServerMessage[] = [];
   send(msg: ServerMessage): void {
-    this.sent.push(msg);
+    // Copy, like a real socket serialising: the room keeps mutating its world afterwards.
+    this.sent.push(JSON.parse(JSON.stringify(msg)) as ServerMessage);
   }
   last<T extends ServerMessage["t"]>(t: T): Extract<ServerMessage, { t: T }> | undefined {
     return this.sent.filter((m) => m.t === t).at(-1) as Extract<ServerMessage, { t: T }> | undefined;
   }
 }
 
+let seq = 0;
+const one = (input: PieceInput): TickInput[] => [{ seq: seq++, input }];
+
 function setup() {
   let time = 0;
   const room = new Room("TEST", defaultConfig, () => time);
   const advance = (ms: number): void => {
     // Step the clock in small increments like the real poll loop.
-    for (let t = 0; t < ms; t += 4) {
-      time += 4;
+    const end = time + ms;
+    while (time < end) {
+      time = Math.min(time + 4, end);
       room.update();
     }
   };
@@ -114,8 +119,8 @@ describe("Room match", () => {
     const { a, b } = fullMinimum(s);
     s.room.start(a.id);
     const start = s.room.worldCopy()!;
-    s.room.input(b.id, { target: { x: 200, y: 100 } });
-    s.room.input(a.id, { launch: { angle: 0, power: 1 } }); // a is goalie t0, holds the puck
+    s.room.input(b.id, one({ target: { x: 200, y: 100 } }));
+    s.room.input(a.id, one({ launch: { angle: 0, power: 1 } })); // a is goalie t0, holds the puck
     s.advance(500);
     const w = s.room.worldCopy()!;
     const bar = w.blockers.find((x) => x.id === "t0-b0")!;
@@ -131,7 +136,7 @@ describe("Room match", () => {
     const s = setup();
     const { a, b } = fullMinimum(s);
     s.room.start(a.id);
-    s.room.input(b.id, { launch: { angle: 0, power: 1 } });
+    s.room.input(b.id, one({ launch: { angle: 0, power: 1 } }));
     s.advance(200);
     expect(s.room.worldCopy()!.puck.heldBy).toBe(0);
   });
@@ -191,5 +196,105 @@ describe("Room match", () => {
     expect(s.room.stop(a.id)).toBeNull();
     expect(s.room.phase).toBe("lobby");
     expect(s.room.worldCopy()).toBeNull();
+  });
+});
+
+describe("Room input queue (M4)", () => {
+  it("applies one queued input per tick and acks it in snapshots", () => {
+    const s = setup();
+    const { a, b } = fullMinimum(s);
+    s.room.start(a.id);
+    s.room.input(b.id, [
+      { seq: 0, input: { target: { x: 300, y: 100 } } },
+      { seq: 1, input: { target: { x: 300, y: 110 } } },
+      { seq: 2, input: { target: { x: 300, y: 120 } } },
+    ]);
+    s.room.input(b.id, [{ seq: 1, input: { target: { x: 0, y: 0 } } }]); // duplicate: dropped
+    s.advance(1000);
+    const snap = b.conn.last("snapshot")!;
+    expect(snap.acks["t0-b0"]).toBe(2);
+    expect(snap.world.blockers.find((x) => x.id === "t0-b0")!.target).toEqual({ x: 300, y: 120 });
+  });
+
+  it("merges a backed-up queue without losing a shot", () => {
+    const s = setup();
+    const { a } = fullMinimum(s);
+    s.room.start(a.id);
+    const burst = Array.from({ length: 12 }, (_, i) => ({ seq: i, input: { target: { x: 50, y: 300 } } as PieceInput }));
+    burst[3]!.input.launch = { angle: 0, power: 1 };
+    s.room.input(a.id, burst);
+    s.advance(20); // ~1 tick: consumes 1 + merges down to maxInputQueue
+    expect(s.room.worldCopy()!.puck.heldBy).toBeNull();
+    s.advance(200);
+    expect(a.conn.last("snapshot")!.acks["t0-goalie"]).toBe(11);
+  });
+
+  it("a rejoining client can restart its seq counter", () => {
+    const s = setup();
+    const { a, b } = fullMinimum(s);
+    s.room.start(a.id);
+    s.room.input(b.id, [{ seq: 500, input: { target: { x: 300, y: 100 } } }]);
+    s.advance(100);
+    s.room.join(new FakeConn(), "b", b.token);
+    s.room.input(b.id, [{ seq: 0, input: { target: { x: 300, y: 500 } } }]);
+    s.advance(1000);
+    expect(s.room.worldCopy()!.blockers.find((x) => x.id === "t0-b0")!.pos).toEqual({ x: 300, y: 500 });
+  });
+});
+
+describe("client prediction against the real server room", () => {
+  /** Lockstep client/server ticks with fixed or jittery one-way delays (in ticks). */
+  function runPrediction(delayTicks: (rand: () => number) => number, seed: number) {
+    const s = setup();
+    const { a, b } = fullMinimum(s);
+    s.room.start(a.id);
+    const predictor = new Predictor(defaultConfig);
+    const rand = createRng(seed);
+    const toServer: { at: number; inputs: TickInput[] }[] = [];
+    const toClient: { at: number; msg: Extract<ServerMessage, { t: "snapshot" }> }[] = [];
+    let seen = b.conn.sent.length;
+    let clientSeq = 0;
+    let maxCorrection = 0;
+    let lastSendAt = -1;
+
+    for (let t = 0; t < 600; t++) {
+      // Client: a target that sweeps faster than the bar can follow (so timing errors would
+      // show), one input per tick.
+      const input: PieceInput = {
+        target: { x: 300 + 200 * Math.sin(t / 5), y: 300 + 200 * Math.cos(t / 7) },
+        targetAngle: Math.sin(t / 4) * 3,
+      };
+      const entry = { seq: clientSeq++, input };
+      predictor.tick(entry);
+      const sendAt = Math.max(lastSendAt, t + delayTicks(rand)); // TCP: in order
+      lastSendAt = sendAt;
+      toServer.push({ at: sendAt, inputs: [entry] });
+
+      // Network delivery.
+      while (toServer[0] && toServer[0].at <= t) s.room.input(b.id, toServer.shift()!.inputs);
+      s.advance(1000 / 60);
+      for (const msg of b.conn.sent.slice(seen)) {
+        if (msg.t === "snapshot") toClient.push({ at: t + delayTicks(rand), msg });
+      }
+      seen = b.conn.sent.length;
+      toClient.sort((x, y) => x.at - y.at);
+      while (toClient[0] && toClient[0].at <= t) {
+        const { msg } = toClient.shift()!;
+        predictor.reconcile(msg.world, "t0-b0", msg.acks["t0-b0"]);
+        if (t > 60) maxCorrection = Math.max(maxCorrection, predictor.lastCorrection);
+      }
+    }
+    return maxCorrection;
+  }
+
+  it("matches the server exactly under steady latency", () => {
+    expect(runPrediction(() => 6, 1)).toBeLessThan(1e-6);
+  });
+
+  it("stays within a tick or two of motion under jitter", () => {
+    // ROADMAP's 100 ms ± 30 ms RTT: 50 ± 15 ms ≈ 3 ± 1 ticks each way.
+    const max = runPrediction((r) => 2 + Math.floor(r() * 3), 2);
+    expect(max).toBeGreaterThan(0); // jitter really does perturb it…
+    expect(max).toBeLessThan((2 * defaultConfig.bar.moveSpeed) / defaultConfig.sim.tickRate); // …by ≤ 2 ticks
   });
 });
