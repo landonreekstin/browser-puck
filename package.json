@@ -12,7 +12,9 @@
     "test": "vitest run",
     "typecheck": "tsc -p shared && tsc -p server && tsc -p client && tsc -p scripts",
     "verify:ping": "tsx scripts/verify-ping.ts",
-    "verify:sandbox": "tsx scripts/verify-sandbox.ts"
+    "verify:sandbox": "tsx scripts/verify-sandbox.ts",
+    "bot": "npm run bot -w @puck/server --",
+    "verify:room": "tsx scripts/verify-room.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

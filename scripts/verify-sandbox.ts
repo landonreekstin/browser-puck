@@ -35,7 +35,7 @@ declare global {
 }
 
 try {
-  await page.goto(url);
+  await page.goto(`${url}/?sandbox`);
   await page.waitForFunction(() => document.body.dataset.ready === "1");
   await shot("01-initial");
   const w0 = await world();

@@ -38,6 +38,10 @@ before substantive changes.
   - `npm run verify:sandbox` — with `dev` running: drives the M1 sandbox through its real
     mouse/keyboard UI (move/rotate a bar, aim with preview, score, debug overlay, tuning panel)
     with assertions + screenshots
+  - `npm run verify:room` — with `dev` running: 2 browser clients + 6 bots in one room (create,
+    join by link, slots, start, shoot seen on the other client, reload keeps slot, end match)
+  - `npm run bot -- --room CODE --count N` (or `--create --count 8 --start`) — headless bot
+    players; `--goalies` prefers goal slots, `--seconds N` exits after N s
 
 ## Verify before commit (non-negotiable)
 
@@ -103,7 +107,9 @@ npm workspaces; `@puck/shared` is consumed as TS source (no build step) by Vite 
 
 - `shared/` (`@puck/shared`) — sim, physics, `src/config.ts` (all tuning), `src/protocol.ts`
   (message types). Pure TS: its tsconfig has no DOM or Node types.
-- `server/` (`@puck/server`) — `ws` server, rooms, authoritative loop
-- `client/` (`@puck/client`) — Vite + Canvas 2D renderer, input
+- `server/` (`@puck/server`) — `ws` server (`main.ts`), `Room` (slots + authoritative loop,
+  clock injected for tests), `bot.ts` headless bot clients
+- `client/` (`@puck/client`) — Vite + Canvas 2D: `online.ts` (lobby → match, snapshot
+  interpolation), `sandbox.ts` (`?sandbox`, offline M1), shared `render`/`controls`
 - `scripts/` — `dev.mjs` (runs server + client), headless verification scripts
 - `docs/` — DESIGN.md, ROADMAP.md

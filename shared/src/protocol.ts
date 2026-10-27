@@ -1,35 +1,111 @@
-// Wire messages between client and server. JSON for now; swap the encoding here if needed.
+// Wire messages between client and server (JSON). Clients send intents and inputs only —
+// never positions or puck state (CLAUDE.md rule 1). Everything a client sends is validated.
 
-export type ClientMessage = { t: "ping"; id: number; clientTime: number };
+import type { SlotId } from "./sim/slots";
+import type { PieceInput } from "./sim/step";
+import type { World } from "./sim/world";
+import type { Vec } from "./vec";
 
-export type ServerMessage = { t: "pong"; id: number; clientTime: number };
+export interface PlayerInfo {
+  id: string;
+  name: string;
+  slot: SlotId | null;
+  connected: boolean;
+}
+
+export interface RoomState {
+  code: string;
+  phase: "lobby" | "playing";
+  hostId: string | null;
+  players: PlayerInfo[];
+}
+
+export type ClientMessage =
+  | { t: "ping"; id: number; clientTime: number }
+  /** room: null creates a new room. token: rejoin as the same player (from a welcome). */
+  | { t: "join"; room: string | null; name: string; token?: string }
+  | { t: "pickSlot"; slot: SlotId | null }
+  | { t: "start" }
+  | { t: "stop" }
+  | { t: "input"; input: PieceInput };
+
+export type ServerMessage =
+  | { t: "pong"; id: number; clientTime: number }
+  | { t: "welcome"; room: string; playerId: string; token: string }
+  | { t: "room"; room: RoomState }
+  | { t: "snapshot"; world: World }
+  | { t: "error"; message: string };
 
 export function encode(msg: ClientMessage | ServerMessage): string {
   return JSON.stringify(msg);
 }
 
-function parse(raw: string): unknown {
+function parse(raw: string): Record<string, unknown> | undefined {
   try {
-    return JSON.parse(raw);
+    const v: unknown = JSON.parse(raw);
+    return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
   } catch {
     return undefined;
   }
 }
 
-function isPingOrPong(v: unknown, t: "ping" | "pong"): boolean {
-  if (typeof v !== "object" || v === null) return false;
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isStr = (v: unknown, max = 64): v is string => typeof v === "string" && v.length <= max;
+const isVec = (v: unknown): v is Vec =>
+  typeof v === "object" && v !== null && isNum((v as Vec).x) && isNum((v as Vec).y);
+
+function decodeInput(v: unknown): PieceInput | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
   const m = v as Record<string, unknown>;
-  return m.t === t && typeof m.id === "number" && typeof m.clientTime === "number";
+  const input: PieceInput = {};
+  if (m.target !== undefined) {
+    if (!isVec(m.target)) return undefined;
+    input.target = { x: m.target.x, y: m.target.y };
+  }
+  if (m.targetAngle !== undefined) {
+    if (!isNum(m.targetAngle)) return undefined;
+    input.targetAngle = m.targetAngle;
+  }
+  if (m.launch !== undefined) {
+    const l = m.launch as Record<string, unknown> | null;
+    if (typeof l !== "object" || l === null || !isNum(l.angle) || !isNum(l.power)) return undefined;
+    input.launch = { angle: l.angle, power: l.power };
+  }
+  return input;
 }
 
 /** Returns the message, or undefined if `raw` is not a valid client message. */
 export function decodeClientMessage(raw: string): ClientMessage | undefined {
-  const v = parse(raw);
-  return isPingOrPong(v, "ping") ? (v as ClientMessage) : undefined;
+  const m = parse(raw);
+  if (!m) return undefined;
+  switch (m.t) {
+    case "ping":
+      return isNum(m.id) && isNum(m.clientTime) ? { t: "ping", id: m.id, clientTime: m.clientTime } : undefined;
+    case "join": {
+      if (!(m.room === null || isStr(m.room, 16)) || !isStr(m.name)) return undefined;
+      if (m.token !== undefined && !isStr(m.token)) return undefined;
+      const msg: ClientMessage = { t: "join", room: m.room, name: m.name };
+      if (m.token !== undefined) msg.token = m.token;
+      return msg;
+    }
+    case "pickSlot":
+      return m.slot === null || isStr(m.slot, 16) ? { t: "pickSlot", slot: m.slot } : undefined;
+    case "start":
+    case "stop":
+      return { t: m.t };
+    case "input": {
+      const input = decodeInput(m.input);
+      return input ? { t: "input", input } : undefined;
+    }
+    default:
+      return undefined;
+  }
 }
 
-/** Returns the message, or undefined if `raw` is not a valid server message. */
+const serverTypes = new Set(["pong", "welcome", "room", "snapshot", "error"]);
+
+/** Returns the message, or undefined if `raw` is not a server message. The server is trusted. */
 export function decodeServerMessage(raw: string): ServerMessage | undefined {
-  const v = parse(raw);
-  return isPingOrPong(v, "pong") ? (v as ServerMessage) : undefined;
+  const m = parse(raw);
+  return m && typeof m.t === "string" && serverTypes.has(m.t) ? (m as unknown as ServerMessage) : undefined;
 }

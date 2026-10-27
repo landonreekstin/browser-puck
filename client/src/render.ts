@@ -36,16 +36,36 @@ export interface Frame {
   aim: { launch: Launch | null; path: Vec[] } | null;
   debug: { contacts: { contact: Contact; age: number }[]; fps: number; substeps: number; net: string } | null;
   goalFlash: number;
+  /** Name tags drawn above pieces, keyed by piece id. */
+  labels: Record<string, string>;
+  /** Controls hint along the bottom. */
+  help: string;
 }
 
-/** Positions blended between two ticks for smooth rendering at any frame rate. */
+/** Sizes the canvas backing store to its CSS size × devicePixelRatio; returns the CSS size. */
+export function fitCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): { w: number; h: number } {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w, h };
+}
+
+/** Positions blended between two states (matched by piece id) for smooth rendering. */
 export function interpolate(prev: World, cur: World, alpha: number): World {
   return {
     ...cur,
     puck: { ...cur.puck, pos: lerp(prev.puck.pos, cur.puck.pos, alpha) },
-    goalies: cur.goalies.map((g, i) => ({ ...g, pos: lerp(prev.goalies[i]?.pos ?? g.pos, g.pos, alpha) })),
-    blockers: cur.blockers.map((b, i) => {
-      const p = prev.blockers[i] ?? b;
+    goalies: cur.goalies.map((g) => {
+      const p = prev.goalies.find((x) => x.id === g.id) ?? g;
+      return { ...g, pos: lerp(p.pos, g.pos, alpha) };
+    }),
+    blockers: cur.blockers.map((b) => {
+      const p = prev.blockers.find((x) => x.id === b.id) ?? b;
       return { ...b, pos: lerp(p.pos, b.pos, alpha), angle: p.angle + (b.angle - p.angle) * alpha };
     }),
   };
@@ -82,6 +102,7 @@ export function render(ctx: CanvasRenderingContext2D, width: number, height: num
   if (f.aim) drawAim(ctx, cfg, world, f.aim, px);
 
   circle(ctx, world.puck.pos, cfg.puck.radius, colors.puck);
+  drawLabels(ctx, cfg, world, f.labels, px);
   if (f.debug) drawDebug(ctx, world, f.debug, px);
   ctx.restore();
 
@@ -218,7 +239,7 @@ function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, f
   ctx.font = "13px ui-monospace, monospace";
   ctx.fillStyle = colors.dim;
   ctx.fillText(
-    `selected: ${f.selectedId}   1–6/Tab select · mouse move · drag shoot (goalie) · wheel/Q/E rotate (bar) · R give puck · F3 debug · T tuning`,
+    f.help,
     12,
     height - 22,
   );
@@ -233,6 +254,34 @@ function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, f
     ctx.fillStyle = colors.debug;
     lines.forEach((l, i) => ctx.fillText(l, 12, 12 + i * 16));
   }
+}
+
+function drawLabels(
+  ctx: CanvasRenderingContext2D,
+  cfg: Config,
+  world: World,
+  labels: Record<string, string>,
+  px: number,
+): void {
+  ctx.font = `${12 * px}px ui-monospace, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  const tag = (id: string, at: Vec, above: number): void => {
+    const text = labels[id];
+    if (!text) return;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    const w = ctx.measureText(text).width + 8 * px;
+    ctx.fillRect(at.x - w / 2, at.y - above - 16 * px, w, 15 * px);
+    ctx.fillStyle = colors.text;
+    ctx.fillText(text, at.x, at.y - above - 2 * px);
+  };
+  for (const g of world.goalies) tag(g.id, g.pos, cfg.goalie.radius + 4 * px);
+  for (const b of world.blockers) {
+    const seg = barSegment(b.pos, b.angle, cfg.bar.length);
+    tag(b.id, { x: b.pos.x, y: Math.min(seg.a.y, seg.b.y) }, cfg.bar.thickness / 2 + 4 * px);
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 }
 
 function circle(ctx: CanvasRenderingContext2D, c: Vec, r: number, fill: string): void {

@@ -7,6 +7,18 @@ export interface Config {
     port: number;
     /** How often the client sends a ping to measure RTT. */
     pingIntervalMs: number;
+    /** Server → client world snapshots per second. */
+    snapshotRate: number;
+    /** Client → server input messages per second (at most; only sent when changed). */
+    inputRate: number;
+    /** How far behind the newest snapshot remote pieces are rendered. */
+    interpDelayMs: number;
+  };
+  room: {
+    maxBlockersPerTeam: number;
+    /** A disconnected player keeps their slot this long. */
+    reconnectGraceSeconds: number;
+    nameMaxLength: number;
   };
   sim: {
     /** Fixed physics rate (Hz), independent of render and network rate. */
@@ -54,7 +66,8 @@ export interface Config {
 }
 
 export const defaultConfig: Config = {
-  net: { port: 8787, pingIntervalMs: 1000 },
+  net: { port: 8787, pingIntervalMs: 1000, snapshotRate: 30, inputRate: 30, interpDelayMs: 100 },
+  room: { maxBlockersPerTeam: 3, reconnectGraceSeconds: 120, nameMaxLength: 16 },
   sim: { tickRate: 60, substepTravel: 0.5, maxSubsteps: 64 },
   rink: { width: 1200, height: 600, wallRestitution: 0.9 },
   goal: { width: 160 },
