@@ -43,7 +43,7 @@ function save(key: string, value: string): void {
 export function startOnline(canvas: HTMLCanvasElement, net: Net, roomFromUrl: string | null): void {
   const ctx = canvas.getContext("2d")!;
   const view = new View();
-  const controls = new Controls(canvas, view, () => cfg);
+  const controls: Controls = new Controls(canvas, view, () => cfg, () => predictor.pose()?.pos ?? null);
   const snapshots = new SnapshotBuffer(cfg);
   const predictor = new Predictor(cfg);
   const effects = new Effects(cfg);

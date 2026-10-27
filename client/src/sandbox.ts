@@ -30,7 +30,10 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
 
   let world: World = createWorld(cfg);
   let prev: World = cloneWorld(world);
-  const controls = new Controls(canvas, view, () => cfg);
+  const controls: Controls = new Controls(canvas, view, () => cfg, () => {
+    const id = controls.piece?.id;
+    return (world.goalies.find((g) => g.id === id) ?? world.blockers.find((b) => b.id === id))?.pos ?? null;
+  });
   let selected = 0;
 
   /** Selection order: team 0 goalie, team 0 bars, team 1 goalie, team 1 bars. */
