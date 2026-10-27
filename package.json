@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "build": "npm run build -w @puck/client && npm run build -w @puck/server",
+    "start": "node server/dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc -p shared && tsc -p server && tsc -p client && tsc -p scripts",
     "verify:ping": "tsx scripts/verify-ping.ts",

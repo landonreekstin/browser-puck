@@ -1,12 +1,23 @@
+import { createServer } from "node:http";
+import { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { decodeClientMessage, defaultConfig as config, encode, type ServerMessage } from "@puck/shared";
 import type { Conn, Room } from "./room";
 import { Rooms } from "./rooms";
+import { defaultStaticDir, staticHandler } from "./static";
 
 const port = Number(process.env.PORT ?? config.net.port);
+const host = process.env.HOST ?? "0.0.0.0";
+const staticDir = defaultStaticDir(dirname(fileURLToPath(import.meta.url)));
 const rooms = new Rooms(config, () => performance.now());
-const wss = new WebSocketServer({ port });
+
+// One HTTP server: the built client (if present) plus the game WebSocket at net.wsPath.
+const http = createServer(
+  staticDir ? staticHandler(staticDir) : (_req, res) => res.writeHead(404).end("client not built; use the Vite dev server\n"),
+);
+const wss = new WebSocketServer({ server: http, path: config.net.wsPath });
 
 wss.on("connection", (socket, req) => {
   const conn: Conn = {
@@ -62,6 +73,6 @@ wss.on("connection", (socket, req) => {
 // Rooms tick on their own fixed-step clock; this just polls often enough to keep up.
 setInterval(() => rooms.update(), 4);
 
-wss.on("listening", () => {
-  console.log(`listening on ws://0.0.0.0:${port}`);
+http.listen(port, host, () => {
+  console.log(`listening on http://${host}:${port} (ws ${config.net.wsPath}, static ${staticDir ?? "off"})`);
 });
