@@ -14,15 +14,16 @@ depends on before starting it.
 | Server | Node 24 + `ws`, **server-authoritative** | 8 players, no trust in clients |
 | Client | Vite + Canvas 2D | boring and enough for flat shapes; revisit (PixiJS) only if needed |
 | Tests | Vitest | sim is pure functions → unit-testable |
-| Verify GUI | headless Chromium (nix) + scripted bot clients | GUI changes get *shown* working, not asserted |
+| Verify GUI | `playwright-core` driving the nix Chromium + scripted bot clients | GUI changes get *shown* working, not asserted |
+| Dev runner | `scripts/dev.mjs` (plain Node) | starts server + client without adding `concurrently` |
 
 ## M0 — Scaffolding
 
-- [ ] npm workspaces with `shared`, `server`, `client`; strict `tsconfig`
-- [ ] Vite dev server for client, `tsx watch` (or similar) for server
-- [ ] Vitest wired up; one trivial test passes
-- [ ] Client connects to server over WebSocket and displays a ping/RTT
-- [ ] `npm run dev` starts both; `npm test`, `npm run typecheck` documented in CLAUDE.md
+- [x] npm workspaces with `shared`, `server`, `client`; strict `tsconfig`
+- [x] Vite dev server for client, `tsx watch` (or similar) for server
+- [x] Vitest wired up; one trivial test passes
+- [x] Client connects to server over WebSocket and displays a ping/RTT
+- [x] `npm run dev` starts both; `npm test`, `npm run typecheck` documented in CLAUDE.md
 
 ## M1 — Offline physics sandbox (single screen, no networking)
 

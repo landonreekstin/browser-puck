@@ -26,9 +26,15 @@ before substantive changes.
 - **`nix develop` (or direnv via `.envrc`) is the only supported entry point.** Node 24,
   npm and Chromium come from `flake.nix`. No global `npm install -g`, no nvm; project deps
   go in `package.json` and `node_modules/.bin` is on `PATH` inside the shell.
-- Playwright, if adopted, must use the nix Chromium (`$CHROMIUM_PATH`,
-  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is set) — its own downloaded browsers don't run on NixOS.
-- Build/test commands are added here as M0 creates them.
+- Headless verification uses `playwright-core` with the nix Chromium (`$CHROMIUM_PATH`,
+  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is set) — Playwright's own downloaded browsers don't run on NixOS.
+- Commands (inside the devshell, from the repo root):
+  - `npm install` — install all workspaces
+  - `npm run dev` — server (`tsx watch`, ws on :8787) + client (Vite on :5173); Ctrl-C stops both
+  - `npm test` — Vitest (`shared/**/*.test.ts`, `server/**/*.test.ts`)
+  - `npm run typecheck` — `tsc` over every workspace and `scripts/`
+  - `npm run verify:ping` — with `dev` running: opens 2 headless clients (`CLIENTS=8` for more),
+    checks each connects and shows an RTT, screenshots into `screenshots/`
 
 ## Verify before commit (non-negotiable)
 
@@ -88,9 +94,13 @@ Carried over from nixos-config, where it was violated often enough to become the
   (vaultwarden), 8123 (Home Assistant), plus game-server ports. Pick something free for the
   game server (proposal: **8787**) and make it a module option.
 
-## Layout (planned — update as M0 lands)
+## Layout
 
-- `shared/` — sim, physics, config, message types (pure TS)
-- `server/` — `ws` server, rooms, authoritative loop
-- `client/` — Vite + Canvas 2D renderer, input
+npm workspaces; `@puck/shared` is consumed as TS source (no build step) by Vite and tsx.
+
+- `shared/` (`@puck/shared`) — sim, physics, `src/config.ts` (all tuning), `src/protocol.ts`
+  (message types). Pure TS: its tsconfig has no DOM or Node types.
+- `server/` (`@puck/server`) — `ws` server, rooms, authoritative loop
+- `client/` (`@puck/client`) — Vite + Canvas 2D renderer, input
+- `scripts/` — `dev.mjs` (runs server + client), headless verification scripts
 - `docs/` — DESIGN.md, ROADMAP.md
