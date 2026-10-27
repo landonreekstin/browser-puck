@@ -314,3 +314,18 @@ describe("Room kickoff", () => {
     }
   });
 });
+
+describe("Room events", () => {
+  it("attaches launch, hit and goal events to snapshots, each sent once", () => {
+    const s = setup();
+    const { a } = fullMinimum(s);
+    s.room.start(a.id);
+    s.room.input(a.id, one({ launch: { angle: 0.4, power: 1 } }));
+    s.advance(3000);
+    const all = a.conn.sent.flatMap((m) => (m.t === "snapshot" ? m.events : []));
+    expect(all.filter((e) => e.type === "launch")).toHaveLength(1);
+    expect(all.some((e) => e.type === "hit" && e.impact > 0)).toBe(true);
+    const ticks = all.map((e) => `${e.tick}:${e.type}:${JSON.stringify(e)}`);
+    expect(new Set(ticks).size).toBe(ticks.length);
+  });
+});

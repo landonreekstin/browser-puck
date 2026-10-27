@@ -56,6 +56,9 @@ export class Lobby {
     code.addEventListener("keydown", (e) => {
       if (e.key === "Enter") join.click();
     });
+    name.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") (code.value.trim() ? join : create).click();
+    });
     this.root.replaceChildren(
       el("h1", { textContent: "browser-puck" }),
       el("label", {}, "Name ", name),
@@ -77,8 +80,24 @@ export class Lobby {
     if (this.root.hidden) return;
 
     const link = `${location.origin}${location.pathname}?room=${room.code}`;
-    const copy = el("button", { textContent: "Copy link" });
-    copy.addEventListener("click", () => void navigator.clipboard?.writeText(link).catch(() => {}));
+    const copy = el("button", { id: "copy-link", textContent: "Copy link" });
+    copy.addEventListener("click", () => {
+      void navigator.clipboard
+        ?.writeText(link)
+        .then(() => {
+          copy.textContent = "Copied!";
+          setTimeout(() => (copy.textContent = "Copy link"), 1500);
+        })
+        .catch(() => {});
+    });
+    const share: HTMLElement[] = [];
+    if (typeof navigator.share === "function") {
+      const button = el("button", { textContent: "Share" });
+      button.addEventListener("click", () => void navigator.share({ title: "browser-puck", url: link }).catch(() => {}));
+      share.push(button);
+    }
+    const nameOf = (p: { id: string; name: string; connected: boolean }): string =>
+      `${p.id === room.hostId ? "★ " : ""}${p.name}${p.connected ? "" : " (away)"}`;
 
     const teams = ([0, 1] as const).map((team) => {
       const rows = allSlots(this.cfg)
@@ -96,7 +115,7 @@ export class Lobby {
           } else {
             action = el("span");
           }
-          const who = holder ? `${holder.name}${holder.connected ? "" : " (away)"}` : "—";
+          const who = holder ? nameOf(holder) : "—";
           const row = el("div", { className: `slot${holder?.id === myId ? " mine" : ""}` }, el("span", { textContent: label }), el("span", { className: "who", textContent: who }), action);
           row.dataset.slot = slot.id;
           return row;
@@ -106,7 +125,7 @@ export class Lobby {
       return col;
     });
 
-    const spectators = room.players.filter((p) => p.slot === null).map((p) => p.name + (p.connected ? "" : " (away)"));
+    const spectators = room.players.filter((p) => p.slot === null).map(nameOf);
     const footer: HTMLElement[] = [];
     if (room.phase === "lobby") {
       const problem = startProblem(this.cfg, room.players.map((p) => p.slot));
@@ -123,7 +142,8 @@ export class Lobby {
 
     this.root.replaceChildren(
       el("h1", { textContent: `Room ${room.code}` }),
-      el("div", { className: "row" }, el("input", { value: link, readOnly: true, className: "link" }), copy),
+      el("div", { className: "row" }, el("input", { value: link, readOnly: true, className: "link" }), copy, ...share),
+      el("p", { className: "dim", textContent: "Pick a slot. Each team needs a goalie and at least one blocker (★ = host)." }),
       el("div", { className: "teams" }, ...teams),
       el("p", { className: "dim", textContent: `Spectating: ${spectators.join(", ") || "—"}` }),
       el("div", { className: "row" }, ...footer),

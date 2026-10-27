@@ -49,6 +49,13 @@
       #lobby .dim, #lobby .dim a { color: #8b949e; }
       #lobby .error { color: #ff7b72; min-height: 1.2em; }
       #end-match { position: fixed; top: 10px; right: 10px; }
+      #rotate-buttons { position: fixed; bottom: 40px; left: 12px; display: flex; gap: 12px; }
+      #rotate-buttons[hidden] { display: none; }
+      #rotate-buttons button {
+        width: 64px; height: 64px; border-radius: 50%; font-size: 30px; touch-action: none;
+        background: rgba(33, 38, 45, 0.85); color: #e6edf3; border: 1px solid #30363d;
+        user-select: none; -webkit-user-select: none;
+      }
       #lobby.docked {
         top: auto; left: auto; right: 10px; bottom: 36px; transform: none;
         width: min(440px, calc(100vw - 32px)); padding: 12px; font-size: 12px; opacity: 0.92;

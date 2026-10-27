@@ -18,7 +18,8 @@
     "bot": "npm run bot -w @puck/server --",
     "verify:room": "tsx scripts/verify-room.ts",
     "verify:netcode": "tsx scripts/verify-netcode.ts",
-    "verify:rules": "tsx scripts/verify-rules.ts"
+    "verify:rules": "tsx scripts/verify-rules.ts",
+    "verify:touch": "tsx scripts/verify-touch.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

@@ -80,6 +80,10 @@ try {
   check(speed > 500, `puck launched (speed ${speed})`);
 
   await page.waitForFunction(() => document.body.dataset.score === "1-0", undefined, { timeout: 4000 }).catch(() => {});
+  await wait(150);
+  await shot("05a-goal-celebration");
+  const sounds = Number(await page.evaluate(() => document.body.dataset.sounds));
+  check(sounds >= 2, `launch + goal events reached the sound player (${sounds} played)`);
   const w1 = await world();
   check(w1.score[0] === 1 && w1.score[1] === 0, `goal scored (score ${w1.score.join("-")})`);
   check(w1.puck.heldBy === 1, "conceding goalie got the puck");
@@ -105,7 +109,7 @@ try {
   await page.mouse.down();
   await moveTo(page, { x: 1140, y: 150 }, 15);
   await page.mouse.up();
-  await wait(420);
+  await wait(330);
   await shot("07-bank-shot-debug");
   check((await world()).puck.heldBy === null, "bank shot launched");
 

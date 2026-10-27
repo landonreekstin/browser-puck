@@ -23,6 +23,10 @@ export interface Contact {
   normal: Vec;
   /** Puck centre at the moment of contact. */
   puckPos: Vec;
+  /** Speed into the obstacle (for effects: louder, bigger flash). */
+  impact: number;
+  /** The bar or goalie that was hit (walls: undefined). */
+  pieceId?: string;
 }
 
 export interface StepEvents {
@@ -192,8 +196,11 @@ function resolveCollisions(
 ): void {
   const puck = world.puck;
   const r = cfg.puck.radius;
-  const record = (kind: Contact["kind"], hit: Hit | null): void => {
-    if (hit?.bounced) contacts.push({ kind, point: hit.point, normal: hit.normal, puckPos: { ...puck.pos } });
+  const record = (kind: Contact["kind"], hit: Hit | null, pieceId?: string): void => {
+    if (!hit?.bounced) return;
+    const contact: Contact = { kind, point: hit.point, normal: hit.normal, puckPos: { ...puck.pos }, impact: hit.impact };
+    if (pieceId) contact.pieceId = pieceId;
+    contacts.push(contact);
   };
 
   // A few passes so corners (bar against wall, post) settle. Walls go last so the puck
@@ -201,14 +208,14 @@ function resolveCollisions(
   for (let iter = 0; iter < 3; iter++) {
     for (const b of world.blockers) {
       const seg = barSegment(b.pos, b.angle, cfg.bar.length);
-      record("bar", collideCapsule(puck, r, seg.a, seg.b, cfg.bar.thickness / 2, cfg.bar.restitution));
+      record("bar", collideCapsule(puck, r, seg.a, seg.b, cfg.bar.thickness / 2, cfg.bar.restitution), b.id);
     }
     for (const g of world.goalies) {
       if (puck.passThroughGoalie === g.team) {
         if (distance(puck.pos, g.pos) < r + cfg.goalie.radius) continue;
         puck.passThroughGoalie = null;
       }
-      record("goalie", collideCapsule(puck, r, g.pos, g.pos, cfg.goalie.radius, cfg.goalie.restitution));
+      record("goalie", collideCapsule(puck, r, g.pos, g.pos, cfg.goalie.radius, cfg.goalie.restitution), g.id);
     }
     for (const w of walls) {
       record("wall", collideCapsule(puck, r, w.a, w.b, 0, cfg.rink.wallRestitution));

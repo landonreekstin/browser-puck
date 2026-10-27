@@ -3,6 +3,7 @@ import {
   cloneWorld,
   createWorld,
   defaultConfig,
+  eventsFromStep,
   givePuck,
   predictPath,
   step,
@@ -11,8 +12,10 @@ import {
   type World,
 } from "@puck/shared";
 import { Controls, type ControlledPiece } from "./controls";
+import { Effects } from "./effects";
 import type { Net } from "./net";
 import { fitCanvas, interpolate, render } from "./render";
+import { Sfx } from "./sound";
 import { createTuningPanel } from "./tuning";
 import { View } from "./view";
 
@@ -27,7 +30,10 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
 
   let world: World = createWorld(cfg);
   let prev: World = cloneWorld(world);
-  const controls = new Controls(canvas, view, () => cfg);
+  const controls: Controls = new Controls(canvas, view, () => cfg, () => {
+    const id = controls.piece?.id;
+    return (world.goalies.find((g) => g.id === id) ?? world.blockers.find((b) => b.id === id))?.pos ?? null;
+  });
   let selected = 0;
 
   /** Selection order: team 0 goalie, team 0 bars, team 1 goalie, team 1 bars. */
@@ -43,6 +49,8 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
   };
   select(0);
 
+  const effects = new Effects(cfg);
+  const sfx = new Sfx();
   let showDebug = false;
   let contacts: { contact: Contact; age: number }[] = [];
   let lastSubsteps = 0;
@@ -80,6 +88,10 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
     const events = step(world, cfg, input && controls.piece ? { [controls.piece.id]: input } : {});
     lastSubsteps = events.substeps;
     for (const contact of events.contacts) contacts.push({ contact, age: 0 });
+    for (const e of eventsFromStep(world.tick, events)) {
+      effects.event(e, world);
+      sfx.play(e);
+    }
     if (events.goal) {
       goalFlash = 1;
       prev = cloneWorld(world); // the puck teleported; don't interpolate across it
@@ -109,16 +121,19 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
     const launch = controls.currentLaunch();
     const aiming = piece.kind === "goalie" && controls.dragStart !== null;
 
+    const shown = interpolate(prev, world, acc / dt);
+    effects.update(elapsed, shown);
     render(ctx, w, h, {
       cfg,
       view,
-      world: interpolate(prev, world, acc / dt),
+      world: shown,
+      effects,
       selectedId: piece.id,
       aim: aiming ? { launch, path: launch ? predictPath(world, cfg, piece.team, launch) : [] } : null,
       debug: showDebug ? { contacts, fps, substeps: lastSubsteps, net: net.describe() } : null,
       goalFlash,
       labels: {},
-      help: "1–6/Tab select · mouse move · drag shoot (goalie) · wheel/Q/E rotate (bar) · R give puck · F3 debug · T tuning",
+      help: `1–6/Tab select · mouse move · drag shoot (goalie) · wheel/Q/E rotate (bar) · R give puck · F3 debug · T tuning · M sound ${sfx.isMuted ? "off" : "on"}`,
     });
 
     // State for scripted headless checks (scripts/verify-sandbox.ts).
@@ -129,6 +144,7 @@ export function startSandbox(canvas: HTMLCanvasElement, net: Net): void {
     d.puckSpeed = Math.hypot(world.puck.vel.x, world.puck.vel.y).toFixed(1);
     d.selected = piece.id;
     d.winner = String(world.winner ?? "");
+    d.sounds = String(sfx.played);
     requestAnimationFrame(frame);
   }
 

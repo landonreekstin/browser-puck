@@ -12,6 +12,7 @@ import {
   type Vec,
   type World,
 } from "@puck/shared";
+import type { Effects } from "./effects";
 import type { View } from "./view";
 
 export const teamColor: Record<Team, string> = { 0: "#4aa3ff", 1: "#ff6b6b" };
@@ -46,6 +47,7 @@ export interface Frame {
   labels: Record<string, string>;
   /** Controls hint along the bottom. */
   help: string;
+  effects?: Effects;
 }
 
 /** Sizes the canvas backing store to its CSS size × devicePixelRatio; returns the CSS size. */
@@ -82,8 +84,9 @@ export function render(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.fillStyle = colors.background;
   ctx.fillRect(0, 0, width, height);
 
+  const shake = f.effects?.shake() ?? { x: 0, y: 0 };
   ctx.save();
-  ctx.translate(view.offsetX, view.offsetY);
+  ctx.translate(view.offsetX + shake.x, view.offsetY + shake.y);
   ctx.scale(view.scale, view.scale);
   const px = 1 / view.scale; // one CSS pixel, in world units
 
@@ -95,6 +98,8 @@ export function render(ctx: CanvasRenderingContext2D, width: number, height: num
       strokeCapsule(ctx, seg.a, seg.b, cfg.bar.thickness + 8 * px, "rgba(255,255,255,0.35)");
     }
     strokeCapsule(ctx, seg.a, seg.b, cfg.bar.thickness, teamColor[b.team]);
+    const flash = f.effects?.flash(b.id) ?? 0;
+    if (flash > 0) strokeCapsule(ctx, seg.a, seg.b, cfg.bar.thickness + 4 * px * flash, `rgba(255,255,255,${0.8 * flash})`);
   }
 
   for (const g of world.goalies) {
@@ -103,18 +108,23 @@ export function render(ctx: CanvasRenderingContext2D, width: number, height: num
     }
     circle(ctx, g.pos, cfg.goalie.radius, teamColor[g.team]);
     circle(ctx, g.pos, cfg.goalie.radius * 0.55, "rgba(0,0,0,0.25)");
+    const flash = f.effects?.flash(g.id) ?? 0;
+    if (flash > 0) circle(ctx, g.pos, cfg.goalie.radius + 2 * px, `rgba(255,255,255,${0.6 * flash})`);
   }
 
   if (f.aim) drawAim(ctx, cfg, world, f.aim, px);
 
+  f.effects?.drawUnder(ctx);
   circle(ctx, world.puck.pos, cfg.puck.radius, colors.puck);
   drawRuleTimers(ctx, cfg, world, px);
+  f.effects?.drawOver(ctx, px);
   drawLabels(ctx, cfg, world, f.labels, px);
   if (f.debug) drawDebug(ctx, world, f.debug, px);
   if (world.winner !== null) drawWinner(ctx, cfg, world.winner, px);
   ctx.restore();
 
   drawHud(ctx, width, height, f);
+  f.effects?.drawScreen(ctx, width, height);
 }
 
 /** Shot timer ring on the holding goalie; a filling ring on a dead puck. */

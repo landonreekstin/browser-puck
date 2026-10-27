@@ -86,10 +86,10 @@ fraction of snapshots dropped). The debug overlay (F3) shows the correction and 
 
 ## M5 — Presentation
 
-- [ ] Visual pass: team colours, puck trail, hit flashes, goal celebration
-- [ ] Sound effects
-- [ ] Touch controls (phone/tablet) for both roles
-- [ ] Lobby/room UI polish, shareable invite link
+- [x] Visual pass: team colours, puck trail, hit flashes, goal celebration
+- [x] Sound effects — synthesised (Web Audio), M mutes; not yet heard by a human
+- [x] Touch controls (phone/tablet) for both roles — scheme **proposed by Claude** in DESIGN.md, pending review
+- [x] Lobby/room UI polish, shareable invite link
 
 ## M6 — Homelab deployment
 
