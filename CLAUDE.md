@@ -35,6 +35,9 @@ before substantive changes.
   - `npm run typecheck` — `tsc` over every workspace and `scripts/`
   - `npm run verify:ping` — with `dev` running: opens 2 headless clients (`CLIENTS=8` for more),
     checks each connects and shows an RTT, screenshots into `screenshots/`
+  - `npm run verify:sandbox` — with `dev` running: drives the M1 sandbox through its real
+    mouse/keyboard UI (move/rotate a bar, aim with preview, score, debug overlay, tuning panel)
+    with assertions + screenshots
 
 ## Verify before commit (non-negotiable)
 

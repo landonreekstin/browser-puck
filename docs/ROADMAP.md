@@ -29,14 +29,18 @@ depends on before starting it.
 
 The feel of the game is decided here. Everything lives in `shared/sim`.
 
-- [ ] Rink, walls, centre line, goals, goalie boxes rendered from the shared config
-- [ ] Puck with friction + wall restitution; fixed-timestep sim (e.g. 60 Hz) decoupled from render
-- [ ] Goalie: confined to box; click-drag slingshot launch with aim line + power meter
-- [ ] Blocker bar: capsule collision, move (confined to half minus goalie box), rotate
-- [ ] Bars reflect but never add energy; unit tests prove it (speed after hit ≤ before)
-- [ ] Tunneling-safe at max puck speed (substeps or swept collision) — tested
-- [ ] Goal detection
-- [ ] Debug overlay: velocities, collision normals, a live tuning panel for the knobs
+- [x] Rink, walls, centre line, goals, goalie boxes rendered from the shared config
+- [x] Puck with friction + wall restitution; fixed-timestep sim (e.g. 60 Hz) decoupled from render
+- [x] Goalie: confined to box; click-drag slingshot launch with aim line + power meter
+- [x] Blocker bar: capsule collision, move (confined to half minus goalie box), rotate
+- [x] Bars reflect but never add energy; unit tests prove it (speed after hit ≤ before)
+- [x] Tunneling-safe at max puck speed (substeps or swept collision) — tested
+- [x] Goal detection
+- [x] Debug overlay: velocities, collision normals, a live tuning panel for the knobs
+
+Sandbox controls: `1`–`6`/Tab select a piece · mouse = move target · drag = goalie slingshot
+(Esc cancels) · wheel or Q/E = rotate bar · R = give the puck to that team's goalie · F3 or
+`` ` `` = debug overlay · T = tuning panel ("Copy changes" exports tweaked knobs as JSON).
 
 ## M2 — Multiplayer core
 
