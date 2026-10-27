@@ -73,8 +73,9 @@ export class Net {
   }
 
   private connect(): void {
-    // Dev: the server runs on its own port. M6 moves it to same-origin.
-    const ws = new WebSocket(`ws://${location.hostname}:${config.net.port}`);
+    // Same origin as the page: the game server serves both (prod) or Vite proxies it (dev).
+    const scheme = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${scheme}://${location.host}${config.net.wsPath}`);
     this.socket = ws;
     this.setStatus("connecting");
 

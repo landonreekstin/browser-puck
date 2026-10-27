@@ -30,7 +30,11 @@ before substantive changes.
   `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is set) — Playwright's own downloaded browsers don't run on NixOS.
 - Commands (inside the devshell, from the repo root):
   - `npm install` — install all workspaces
-  - `npm run dev` — server (`tsx watch`, ws on :8787) + client (Vite on :5173); Ctrl-C stops both
+  - `npm run dev` — server (`tsx watch` on :8787, ws at `/ws`) + client (Vite on :5173, proxies
+    `/ws`); Ctrl-C stops both. Open http://localhost:5173 (sandbox: `/?sandbox`)
+  - `npm run build` / `npm start` — production bundle; one process serves client + ws on
+    `PORT` (see docs/DEPLOY.md). Verify scripts take `CLIENT_URL` and bots take `PUCK_URL`
+    to target it.
   - `npm test` — Vitest (`shared/**/*.test.ts`, `server/**/*.test.ts`)
   - `npm run typecheck` — `tsc` over every workspace and `scripts/`
   - `npm run verify:ping` — with `dev` running: opens 2 headless clients (`CLIENTS=8` for more),
@@ -113,9 +117,9 @@ npm workspaces; `@puck/shared` is consumed as TS source (no build step) by Vite 
 
 - `shared/` (`@puck/shared`) — sim, physics, `src/config.ts` (all tuning), `src/protocol.ts`
   (message types). Pure TS: its tsconfig has no DOM or Node types.
-- `server/` (`@puck/server`) — `ws` server (`main.ts`), `Room` (slots + authoritative loop,
+- `server/` (`@puck/server`) — HTTP + `ws` server (`main.ts`, `static.ts`), `Room` (slots + authoritative loop,
   clock injected for tests), `bot.ts` headless bot clients
 - `client/` (`@puck/client`) — Vite + Canvas 2D: `online.ts` (lobby → match, snapshot
   interpolation), `sandbox.ts` (`?sandbox`, offline M1), shared `render`/`controls`
 - `scripts/` — `dev.mjs` (runs server + client), headless verification scripts
-- `docs/` — DESIGN.md, ROADMAP.md
+- `docs/` — DESIGN.md, ROADMAP.md, DEPLOY.md (build output + nixos-config drafts)

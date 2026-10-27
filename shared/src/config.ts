@@ -5,6 +5,8 @@ export interface Config {
   net: {
     /** Game server port (dev and, by default, deployment). */
     port: number;
+    /** WebSocket path on the game server (same origin as the page; Vite proxies it in dev). */
+    wsPath: string;
     /** How often the client sends a ping to measure RTT. */
     pingIntervalMs: number;
     /** Server → client world snapshots per second. */
@@ -84,7 +86,7 @@ export interface Config {
 }
 
 export const defaultConfig: Config = {
-  net: { port: 8787, pingIntervalMs: 1000, snapshotRate: 30, inputRate: 30, interpDelayMs: 100, maxInputQueue: 4, maxExtrapolateMs: 250 },
+  net: { port: 8787, wsPath: "/ws", pingIntervalMs: 1000, snapshotRate: 30, inputRate: 30, interpDelayMs: 100, maxInputQueue: 4, maxExtrapolateMs: 250 },
   room: { maxBlockersPerTeam: 3, reconnectGraceSeconds: 120, nameMaxLength: 16 },
   sim: { tickRate: 60, substepTravel: 0.5, maxSubsteps: 64 },
   rink: { width: 1200, height: 600, wallRestitution: 0.9 },

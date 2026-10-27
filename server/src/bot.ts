@@ -22,7 +22,7 @@ import {
 
 const { values: args } = parseArgs({
   options: {
-    url: { type: "string", default: `ws://localhost:${cfg.net.port}` },
+    url: { type: "string", default: process.env.PUCK_URL ?? `ws://localhost:${cfg.net.port}${cfg.net.wsPath}` },
     room: { type: "string" },
     create: { type: "boolean", default: false },
     count: { type: "string", default: "1" },
