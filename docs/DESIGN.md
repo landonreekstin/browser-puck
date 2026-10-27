@@ -56,31 +56,46 @@ opposing goal.
 - Controls (proposal): mouse position = bar position target, scroll wheel or Q/E = rotate;
   WASD alternative. Touch scheme **(open)**.
 
-## Puck possession and flow (open — decide in M3)
+## Puck possession and flow (M3)
 
-The core loop needs the puck to end up with a goalie. Candidate rules:
+> **Proposed by Claude while lando was away. Not yet approved, so review it.** Every number
+> is a knob in `shared/src/config.ts` (`rules.*`, `match.*`), and each rule can be switched
+> off by setting its knob to 0.
 
-1. **Catch:** a puck that enters a goalie box slowly enough (below a speed threshold) is
-   caught by that goalie, who then has *N* seconds to shoot or it auto-launches weakly.
-2. **Faceoff:** after a goal, the conceding goalie gets the puck.
-3. **Dead puck:** a puck that stops in a blocker zone is given to the goalie of that half
-   after *N* seconds.
-4. **Fast puck into own box:** can the goalie save it (block) vs. it counts as a catch?
+The core loop needs the puck to end up with a goalie. The rules:
 
-*Provisional for the M1 sandbox only:* rule 2 (the conceding goalie gets the puck after a
-goal), plus a sandbox key that hands the puck to a goalie. M3 replaces this.
+1. **Catch:** a puck whose centre is inside a goalie box and is moving slower than
+   `rules.catchSpeed` is caught by that box's goalie. It then sits on the goalie (it's
+   *held*). A goalie can only shoot while holding.
+2. **Fast puck into own box:** no catch. The goalie can body-block it (a reflection that
+   adds no speed), and it is caught once it slows below `catchSpeed` inside the box. This
+   settles candidate 4: fast pucks are saves, slow ones are catches.
+3. **Shot timer:** a goalie holding the puck for `rules.shotTimerSeconds` auto-launches it
+   weakly (`rules.autoLaunchPower`) straight at the other goal. That keeps the game moving,
+   including when the goalie's player is away.
+4. **Dead puck:** a puck slower than `rules.deadSpeed` outside both boxes for
+   `rules.deadPuckSeconds` is given to the goalie of the half it's in.
+5. **Faceoff:** after a goal, the conceding goalie gets the puck. The first kickoff of a
+   match goes to a random team (the server rolls it; the sim just takes the team).
 
-## Scoring and match structure (open)
+The sandbox's R key (hand the puck to a goalie) stays as a sandbox-only convenience.
+
+## Scoring and match structure (M3)
+
+> **Proposed by Claude, pending review**, like the section above.
 
 - Goal = puck fully crosses the goal line.
-- Match length: first to *N* goals vs. timed periods.
+- **First to `match.goalsToWin` (default 5) wins.** The sim records the winner and freezes
+  the puck. Everyone sees the result, and the host's "End match" returns to the lobby.
+  Timed periods stay a possible alternative; they aren't built.
 - Possible bonus: goals that ricochet off ≥ *k* teammate bars score extra (rewards the
-  intended play style). Worth prototyping.
+  intended play style). Still **(open)**, not built. The sim already reports every bar
+  contact, so it's cheap to add.
 
 ## Teams and lobby
 
 - 4–8 players, two teams, roughly balanced. One goalie per team. In M2 the goalie role is
-  **picked in the lobby** like any other slot. Rotating it each goal stays **(open)** for M3.
+  **picked in the lobby** like any other slot. Rotating it each goal stays **(open)**.
 - Rooms joined by short code / link. No accounts.
 
 ### Rooms and slots (M2)
@@ -97,7 +112,7 @@ goal), plus a sandbox key that hands the puck to a goalie. M3 replaces this.
 - **Disconnect:** your slot and piece are kept (the piece just stops) for
   `room.reconnectGraceSeconds`. Rejoining with the same browser (it keeps a per-room token)
   puts you back in your slot. After the grace period your slot frees up. An unoccupied
-  goalie holding the puck keeps it until someone takes the slot (M3's shot timer fixes this).
+  goalie holding the puck auto-launches it when the shot timer runs out (M3).
 - The host can end the match, which returns everyone to the lobby (score reset).
 
 ## Tuning knobs (to live in one shared config file)

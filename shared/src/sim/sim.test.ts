@@ -14,7 +14,7 @@ const EPS = 1e-9;
 /** A world with the puck loose at `pos` moving at `vel`. */
 function loosePuck(cfg: Config, pos: Vec, vel: Vec): World {
   const world = createWorld(cfg);
-  world.puck = { pos, vel, heldBy: null, passThroughGoalie: null };
+  world.puck = { pos, vel, heldBy: null, passThroughGoalie: null, heldTicks: 0, deadTicks: 0 };
   return world;
 }
 
@@ -61,8 +61,9 @@ describe("blockers never add energy (rule 4)", () => {
           };
         }
         const before = length(world.puck.vel);
-        step(world, cfg, inputs);
-        expect(length(world.puck.vel)).toBeLessThanOrEqual(before + EPS);
+        const events = step(world, cfg, inputs);
+        // The only sanctioned energy source is a goalie launch (incl. the shot timer).
+        if (!events.launched) expect(length(world.puck.vel)).toBeLessThanOrEqual(before + EPS);
       }
     }
   });
@@ -215,7 +216,8 @@ describe("confinement", () => {
 
 describe("puck motion", () => {
   it("drag eventually stops a loose puck", () => {
-    const cfg = defaultConfig;
+    const cfg = cloneConfig(defaultConfig);
+    cfg.rules.deadPuckSeconds = 0;
     const world = loosePuck(cfg, { x: 600, y: 100 }, { x: 0, y: 900 });
     run(world, cfg, 60 * 30);
     expect(world.puck.vel).toEqual({ x: 0, y: 0 });
@@ -286,5 +288,84 @@ describe("launch", () => {
     expect(predictPath(world, cfg, 0, down)).toEqual([]);
     expect(predictPath(world, cfg, 1, down)).toEqual([]);
     expect(world).toEqual(before);
+  });
+});
+
+describe("possession rules (M3)", () => {
+  const box0 = goalieBox(defaultConfig, 0);
+  const inBox0 = { x: (box0.minX + box0.maxX) / 2 + 20, y: box0.minY + 30 };
+
+  it("a slow puck in a goalie box is caught by that goalie", () => {
+    const world = loosePuck(defaultConfig, inBox0, { x: -100, y: 0 });
+    const events = step(world, defaultConfig, {});
+    expect(events.possession).toEqual({ team: 0, reason: "catch" });
+    expect(world.puck.heldBy).toBe(0);
+  });
+
+  it("a fast puck in a goalie box is not caught", () => {
+    const world = loosePuck(defaultConfig, inBox0, { x: 0, y: 900 });
+    expect(step(world, defaultConfig, {}).possession).toBeNull();
+    expect(world.puck.heldBy).toBeNull();
+  });
+
+  it("a dead puck goes to the goalie of its half", () => {
+    const cfg = defaultConfig;
+    const world = loosePuck(cfg, { x: 900, y: 80 }, { x: 0, y: 0 });
+    const limit = cfg.rules.deadPuckSeconds * cfg.sim.tickRate;
+    let possession = null;
+    let ticks = 0;
+    while (!possession && ticks < limit + 5) {
+      possession = step(world, cfg, {}).possession;
+      ticks++;
+    }
+    expect(possession).toEqual({ team: 1, reason: "dead" });
+    expect(ticks).toBe(limit);
+  });
+
+  it("the shot timer auto-launches weakly at the other goal", () => {
+    const cfg = defaultConfig;
+    const world = createWorld(cfg, 2, 1);
+    let launched = null;
+    let ticks = 0;
+    while (!launched && ticks < 1000) {
+      launched = step(world, cfg, {}).launched;
+      ticks++;
+    }
+    expect(launched).toEqual({ team: 1, auto: true });
+    expect(ticks).toBe(cfg.rules.shotTimerSeconds * cfg.sim.tickRate);
+    expect(world.puck.vel.x).toBeLessThan(0); // team 1 shoots left
+    expect(length(world.puck.vel)).toBeCloseTo(cfg.launch.maxSpeed * cfg.rules.autoLaunchPower);
+  });
+
+  it("reports a manual shot as a launch", () => {
+    const world = createWorld(defaultConfig);
+    const events = step(world, defaultConfig, { [world.goalies[0]!.id]: { launch: { angle: 0, power: 1 } } });
+    expect(events.launched).toEqual({ team: 0, auto: false });
+  });
+
+  it("first to goalsToWin wins, and the puck then stays frozen", () => {
+    const cfg = cloneConfig(defaultConfig);
+    cfg.match.goalsToWin = 1;
+    const world = createWorld(cfg);
+    const g1 = world.goalies[1]!;
+    g1.pos = g1.target = { x: 1150, y: 200 };
+    let goal = step(world, cfg, { [world.goalies[0]!.id]: { launch: { angle: 0, power: 1 } } }).goal;
+    for (let t = 0; t < 300 && !goal; t++) goal = step(world, cfg, {}).goal;
+    expect(world.winner).toBe(0);
+    const frozen = cloneWorld(world).puck;
+    run(world, cfg, 600, { [world.goalies[1]!.id]: { launch: { angle: Math.PI, power: 1 } } });
+    expect(world.puck).toEqual(frozen); // no shot timer, no launches
+  });
+
+  it("rules switch off at 0", () => {
+    const cfg = cloneConfig(defaultConfig);
+    cfg.rules.catchSpeed = 0;
+    cfg.rules.shotTimerSeconds = 0;
+    const world = loosePuck(cfg, inBox0, { x: -100, y: 0 });
+    run(world, cfg, 10);
+    expect(world.puck.heldBy).toBeNull();
+    const held = createWorld(cfg);
+    run(held, cfg, 1000);
+    expect(held.puck.heldBy).toBe(0);
   });
 });

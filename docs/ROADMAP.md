@@ -59,10 +59,10 @@ adds prediction.
 
 ## M3 — Rules and match flow
 
-- [ ] Resolve possession/catch/faceoff rules in DESIGN.md, then implement
-- [ ] Score, match end condition, kickoff after a goal
-- [ ] Shot timer for a goalie holding the puck
-- [ ] Optional: multi-deflection bonus scoring
+- [x] Resolve possession/catch/faceoff rules in DESIGN.md, then implement — **proposed by Claude, pending lando's review** (all knobs in `rules.*`/`match.*`)
+- [x] Score, match end condition, kickoff after a goal
+- [x] Shot timer for a goalie holding the puck
+- [ ] Optional: multi-deflection bonus scoring — not built (still open in DESIGN.md)
 
 ## M4 — Netcode feel
 

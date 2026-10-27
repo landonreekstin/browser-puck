@@ -27,6 +27,10 @@ export interface Puck {
   heldBy: Team | null;
   /** Just launched by this team's goalie: ignore that goalie until the puck is clear of it. */
   passThroughGoalie: Team | null;
+  /** Ticks the current goalie has held it (shot timer). */
+  heldTicks: number;
+  /** Consecutive ticks it has been dead (slow, outside the boxes). */
+  deadTicks: number;
 }
 
 export interface World {
@@ -35,13 +39,15 @@ export interface World {
   goalies: Goalie[];
   blockers: Blocker[];
   score: [number, number];
+  /** Set when a team reaches match.goalsToWin; the puck then stays frozen. */
+  winner: Team | null;
 }
 
 /**
  * Starting layout: goalies centred in their boxes, `blockersPerTeam` bars spread across
- * each half, puck with team 0.
+ * each half, puck with the `kickoff` team's goalie.
  */
-export function createWorld(cfg: Config, blockersPerTeam = cfg.sandbox.blockersPerTeam): World {
+export function createWorld(cfg: Config, blockersPerTeam = cfg.sandbox.blockersPerTeam, kickoff: Team = 0): World {
   const { width: w, height: h } = cfg.rink;
   const n = blockersPerTeam;
   const goalies: Goalie[] = [];
@@ -56,12 +62,13 @@ export function createWorld(cfg: Config, blockersPerTeam = cfg.sandbox.blockersP
 
   const world: World = {
     tick: 0,
-    puck: { pos: { x: w / 2, y: h / 2 }, vel: { x: 0, y: 0 }, heldBy: null, passThroughGoalie: null },
+    puck: newPuck({ x: w / 2, y: h / 2 }, null),
     goalies,
     blockers,
     score: [0, 0],
+    winner: null,
   };
-  givePuck(world, 0);
+  givePuck(world, kickoff);
   return world;
 }
 
@@ -96,8 +103,11 @@ export function goalieOf(world: World, team: Team): Goalie {
 }
 
 export function givePuck(world: World, team: Team): void {
-  const g = goalieOf(world, team);
-  world.puck = { pos: { ...g.pos }, vel: { x: 0, y: 0 }, heldBy: team, passThroughGoalie: null };
+  world.puck = newPuck({ ...goalieOf(world, team).pos }, team);
+}
+
+function newPuck(pos: Vec, heldBy: Team | null): Puck {
+  return { pos, vel: { x: 0, y: 0 }, heldBy, passThroughGoalie: null, heldTicks: 0, deadTicks: 0 };
 }
 
 export function cloneWorld(world: World): World {

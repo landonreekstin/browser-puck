@@ -108,11 +108,50 @@ export function render(ctx: CanvasRenderingContext2D, width: number, height: num
   if (f.aim) drawAim(ctx, cfg, world, f.aim, px);
 
   circle(ctx, world.puck.pos, cfg.puck.radius, colors.puck);
+  drawRuleTimers(ctx, cfg, world, px);
   drawLabels(ctx, cfg, world, f.labels, px);
   if (f.debug) drawDebug(ctx, world, f.debug, px);
+  if (world.winner !== null) drawWinner(ctx, cfg, world.winner, px);
   ctx.restore();
 
   drawHud(ctx, width, height, f);
+}
+
+/** Shot timer ring on the holding goalie; a filling ring on a dead puck. */
+function drawRuleTimers(ctx: CanvasRenderingContext2D, cfg: Config, world: World, px: number): void {
+  const { puck } = world;
+  const rate = cfg.sim.tickRate;
+  const arc = (c: Vec, r: number, frac: number, color: string): void => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3 * px;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
+    ctx.stroke();
+  };
+  if (world.winner !== null) return;
+  if (puck.heldBy !== null && cfg.rules.shotTimerSeconds > 0) {
+    const left = 1 - puck.heldTicks / (cfg.rules.shotTimerSeconds * rate);
+    const g = world.goalies.find((x) => x.team === puck.heldBy);
+    if (g) arc(g.pos, cfg.goalie.radius + 7 * px, Math.max(0, left), `hsl(${120 * left}, 80%, 55%)`);
+  } else if (puck.heldBy === null && puck.deadTicks > 0 && cfg.rules.deadPuckSeconds > 0) {
+    arc(puck.pos, cfg.puck.radius + 5 * px, puck.deadTicks / (cfg.rules.deadPuckSeconds * rate), "rgba(255,255,255,0.5)");
+  }
+}
+
+function drawWinner(ctx: CanvasRenderingContext2D, cfg: Config, team: Team, px: number): void {
+  const { width: w, height: h } = cfg.rink;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(0, h / 2 - 60, w, 120);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = teamColor[team];
+  ctx.font = `bold ${48 * px}px ui-monospace, monospace`;
+  ctx.fillText(`Team ${team + 1} wins!`, w / 2, h / 2 - 10);
+  ctx.fillStyle = colors.dim;
+  ctx.font = `${14 * px}px ui-monospace, monospace`;
+  ctx.fillText("the host can end the match to go back to the lobby", w / 2, h / 2 + 32);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 }
 
 function drawRink(ctx: CanvasRenderingContext2D, cfg: Config, px: number, goalFlash: number): void {
@@ -240,6 +279,11 @@ function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, f
   ctx.fillText(":", width / 2, 10);
   ctx.fillStyle = teamColor[1];
   ctx.fillText(String(world.score[1]), width / 2 + 40, 10);
+  if (f.cfg.match.goalsToWin > 0) {
+    ctx.font = "11px ui-monospace, monospace";
+    ctx.fillStyle = colors.dim;
+    ctx.fillText(`first to ${f.cfg.match.goalsToWin}`, width / 2, 40);
+  }
 
   ctx.textAlign = "left";
   ctx.font = "13px ui-monospace, monospace";

@@ -18,7 +18,8 @@ const one = (input: PieceInput): TickInput[] => [{ seq: seq++, input }];
 
 function setup() {
   let time = 0;
-  const room = new Room("TEST", defaultConfig, () => time);
+  // random → 0: team 0 kicks off, so tests know who holds the puck.
+  const room = new Room("TEST", defaultConfig, () => time, () => 0);
   const advance = (ms: number): void => {
     // Step the clock in small increments like the real poll loop.
     const end = time + ms;
@@ -296,5 +297,20 @@ describe("client prediction against the real server room", () => {
     const max = runPrediction((r) => 2 + Math.floor(r() * 3), 2);
     expect(max).toBeGreaterThan(0); // jitter really does perturb it…
     expect(max).toBeLessThan((2 * defaultConfig.bar.moveSpeed) / defaultConfig.sim.tickRate); // …by ≤ 2 ticks
+  });
+});
+
+describe("Room kickoff", () => {
+  it("gives the first kickoff to a random team", () => {
+    for (const [roll, team] of [[0.1, 0], [0.9, 1]] as const) {
+      const room = new Room("TEST", defaultConfig, () => 0, () => roll);
+      const ids = ["t0-goalie", "t0-b0", "t1-goalie", "t1-b0"].map((slot) => {
+        const p = room.join(new FakeConn(), slot);
+        room.pickSlot(p.id, slot);
+        return p.id;
+      });
+      expect(room.start(ids[0]!)).toBeNull();
+      expect(room.worldCopy()!.puck.heldBy).toBe(team);
+    }
   });
 });

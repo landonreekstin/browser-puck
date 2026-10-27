@@ -64,7 +64,9 @@ try {
   check(g1.pos.y < 230 && g1.pos.x >= 1090, `far goalie clamped to its box (${g1.pos.x.toFixed(0)}, ${g1.pos.y.toFixed(0)})`);
 
   // Shooter: select piece 1, put the pointer level with the goal, then slingshot leftwards.
+  // R hands it the puck afresh, so the shot timer can't fire first.
   await page.keyboard.press("1");
+  await page.keyboard.press("r");
   await moveTo(page, { x: 600, y: 300 });
   await wait(500);
   await page.mouse.down();
@@ -109,12 +111,36 @@ try {
 
   // Tuning panel opens and edits a knob live.
   await page.keyboard.press("t");
-  const slider = page.locator("#tuning label", { hasText: "bar.length" }).locator("input");
-  await slider.fill("250");
+  const knob = (name: string) => page.locator("#tuning label", { hasText: name });
+  await knob("bar.length").locator("input").fill("250");
   await wait(100);
   await shot("08-tuning");
-  const len = await page.locator("#tuning label", { hasText: "bar.length" }).locator(".value").textContent();
+  const len = await knob("bar.length").locator(".value").textContent();
   check(len === "250", `tuning panel changed bar.length (${len})`);
+  await knob("bar.length").locator("input").fill("120");
+
+  // Win condition (M3): make the next team-1 goal the winner, then score it.
+  const team1Goals = Number((await page.evaluate(() => document.body.dataset.score))!.split("-")[0]);
+  await knob("match.goalsToWin").locator("input").fill(String(team1Goals + 1));
+  // Hand the keyboard back to the game (keys typed into a slider are ignored on purpose).
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("t");
+  await page.keyboard.press("4");
+  await moveTo(page, { x: 1100, y: 0 });
+  await wait(600);
+  await page.keyboard.press("1");
+  await page.keyboard.press("r");
+  await moveTo(page, { x: 600, y: 300 });
+  await wait(500);
+  await page.mouse.down();
+  await moveTo(page, { x: 380, y: 300 }, 15);
+  await page.mouse.up();
+  await page.waitForFunction(() => document.body.dataset.winner === "0", undefined, { timeout: 4000 }).catch(() => {});
+  check((await page.evaluate(() => document.body.dataset.winner)) === "0", `reaching goalsToWin (${team1Goals + 1}) declares team 1 the winner`);
+  await wait(300);
+  await shot("09-winner");
+  const frozen = await page.evaluate(() => document.body.dataset.puckSpeed);
+  check(frozen === "0.0", "after the win the puck stays frozen");
 } finally {
   await browser.close();
 }
