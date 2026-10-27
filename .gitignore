@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+coverage/
+.direnv/
+result
+result-*
+*.tsbuildinfo
+.env
+.env.*
+
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Headless verification output (screenshots, traces)
+screenshots/
+test-results/
