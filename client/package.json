@@ -1,0 +1,14 @@
+{
+  "name": "@puck/client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "@puck/shared": "*"
+  }
+}
