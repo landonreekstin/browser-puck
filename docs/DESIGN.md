@@ -17,6 +17,8 @@ opposing goal.
 - A **goal** centred on each end wall.
 - A **goalie box** in front of each goal. Only that team's goalie may be inside it.
 - Walls are bouncy (restitution < 1); the puck has light friction so it eventually stops.
+- Orientation: the rink is wider than tall. Team 0 defends the **left** goal, team 1 the
+  **right**. A goal is an opening in the end wall; its edges (posts) are solid.
 
 ## Roles
 
@@ -27,19 +29,30 @@ opposing goal.
   **click (or touch) and drag back and to the sides** — the drag *direction* sets the aim
   (shot goes opposite the pull, like a slingshot) and the drag *length* sets the power,
   clamped to a max.
-- Show an aim preview while dragging (direction line + power meter). How much of the
-  trajectory to preview (none / first segment / first bounce) is a tuning knob. **(open)**
+- Show an aim preview while dragging (direction line + power meter). The preview is the
+  sim's own prediction of the shot with every other piece frozen where it is now, drawn
+  through the first **`aimPreview.bounces`** bounces (knob; default **1**, `0` = only up to
+  the first contact, `-1` = no path, just the aim line). It's a prediction: pieces that move
+  afterwards change the real outcome.
+- The goalie can only launch while **holding** the puck. A held puck sits on the goalie and
+  moves with it.
 - Also acts as a last line of defence by body-blocking inside the box.
 
 ### Blocker (the rest of the team)
 
 - A **flat bar** (rendered as a capsule: a segment with rounded ends).
-- **Moves anywhere in their team's half, outside the goalie box.**
-- **Rotates** to change the deflection angle.
+- **Moves anywhere in their team's half, outside the goalie box.** "Outside" applies to
+  the bar's centre; its rounded ends may overhang the box edge. Bars pass through each other.
+- **Rotates** to change the deflection angle. Movement and rotation are capped by
+  `bar.moveSpeed` / `bar.rotateSpeed`. The input is a *target* pose and the bar moves
+  toward it.
 - **Cannot launch the puck.** A bar imparts no energy of its own: the puck reflects off it
-  (with restitution ≤ 1). Bar movement should *not* add speed to the puck — otherwise
-  blockers become strikers. Whether bar velocity adds a small amount is a tuning knob,
-  default zero. **(open)**
+  with restitution ≤ 1 (clamped in code), and **bar velocity is never transferred to the
+  puck. There is no knob for it** (standing rule 4). A bar moving into a slow or resting
+  puck pushes it out of the way (position only, velocity unchanged), so a blocker can nudge
+  a dead puck at bar speed but can never shoot it. If that turns out to be exploitable,
+  M3's dead-puck rule handles it.
+- Goalies body-block the same way: a reflection that never adds speed.
 - Controls (proposal): mouse position = bar position target, scroll wheel or Q/E = rotate;
   WASD alternative. Touch scheme **(open)**.
 
@@ -53,6 +66,9 @@ The core loop needs the puck to end up with a goalie. Candidate rules:
 3. **Dead puck:** a puck that stops in a blocker zone is given to the goalie of that half
    after *N* seconds.
 4. **Fast puck into own box:** can the goalie save it (block) vs. it counts as a catch?
+
+*Provisional for the M1 sandbox only:* rule 2 (the conceding goalie gets the puck after a
+goal), plus a sandbox key that hands the puck to a goalie. M3 replaces this.
 
 ## Scoring and match structure (open)
 

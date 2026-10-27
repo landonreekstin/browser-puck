@@ -1,5 +1,5 @@
 import { WebSocketServer } from "ws";
-import { config, decodeClientMessage, encode } from "@puck/shared";
+import { defaultConfig as config, decodeClientMessage, encode } from "@puck/shared";
 
 const port = Number(process.env.PORT ?? config.net.port);
 const wss = new WebSocketServer({ port });
