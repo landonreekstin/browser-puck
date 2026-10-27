@@ -15,6 +15,7 @@ import {
   encode,
   slotInfo,
   type ClientMessage,
+  type PieceInput,
   type RoomState,
   type World,
 } from "@puck/shared";
@@ -44,6 +45,7 @@ class Bot {
   private heldSince: number | null = null;
   private shootAfterMs = 0;
   private nextMoveAt = 0;
+  private seq = 0;
 
   constructor(
     readonly name: string,
@@ -58,6 +60,11 @@ class Bot {
 
   send(msg: ClientMessage): void {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(encode(msg));
+  }
+
+  /** Bots only send when they change their mind; the server keeps targets in between. */
+  private sendInput(input: PieceInput): void {
+    this.send({ t: "input", inputs: [{ seq: this.seq++, input }] });
   }
 
   close(): void {
@@ -81,18 +88,24 @@ class Bot {
     if (!msg) return;
     if (msg.t === "welcome") {
       this.playerId = msg.playerId;
+      this.seq = 0;
       this.onRoom(msg.room);
     } else if (msg.t === "room") {
       this.room = msg.room;
       if (!this.slot) this.claimSlot();
     } else if (msg.t === "snapshot") {
       this.world = msg.world;
-    } else if (msg.t === "error" && msg.message !== "slot taken") {
+    } else if (msg.t === "error" && msg.message === "slot taken") {
+      // Lost a race with another bot. Retry shortly: no further room update may come.
+      setTimeout(() => {
+        if (!this.slot) this.claimSlot();
+      }, range(10, 100));
+    } else if (msg.t === "error") {
       console.error(`${this.name}: ${msg.message}`);
     }
   }
 
-  /** Take the first free slot (others may race us; the server's "slot taken" sorts it). */
+  /** Take the best free slot. Others may race us; the server's "slot taken" makes us retry. */
   private claimSlot(): void {
     const taken = new Set(this.room!.players.map((p) => p.slot));
     const free = allSlots(cfg).filter((s) => !taken.has(s.id));
@@ -121,14 +134,14 @@ class Bot {
       if (!holding) this.heldSince = null;
       if (holding && now - this.heldSince! > this.shootAfterMs) {
         const towardGoal = info.team === 0 ? 0 : Math.PI;
-        this.send({ t: "input", input: { launch: { angle: towardGoal + range(-0.9, 0.9), power: range(0.5, 1) } } });
+        this.sendInput({ launch: { angle: towardGoal + range(-0.9, 0.9), power: range(0.5, 1) } });
         this.heldSince = null;
         return;
       }
       if (now >= this.nextMoveAt) {
         this.nextMoveAt = now + range(300, 1200);
         const target = clampGoalieTarget(cfg, info.team, { x: range(0, w), y: range(0, h) });
-        this.send({ t: "input", input: { target } });
+        this.sendInput({ target });
       }
       return;
     }
@@ -137,7 +150,7 @@ class Bot {
       this.nextMoveAt = now + range(500, 2000);
       const x = info.team === 0 ? range(0, w / 2) : range(w / 2, w);
       const target = clampBlockerTarget(cfg, info.team, { x, y: range(0, h) });
-      this.send({ t: "input", input: { target, targetAngle: range(-Math.PI, Math.PI) } });
+      this.sendInput({ target, targetAngle: range(-Math.PI, Math.PI) });
     }
   }
 }

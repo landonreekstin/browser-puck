@@ -40,6 +40,9 @@ before substantive changes.
     with assertions + screenshots
   - `npm run verify:room` — with `dev` running: 2 browser clients + 6 bots in one room (create,
     join by link, slots, start, shoot seen on the other client, reload keeps slot, end match)
+  - `npm run verify:netcode` — with `dev` running: a lagged client (200±60 ms, 10% loss) plus
+    a 60%-loss spectator; measures own-piece response vs server lag, prediction convergence,
+    and the worst frame-to-frame puck jump
   - `npm run bot -- --room CODE --count N` (or `--create --count 8 --start`) — headless bot
     players; `--goalies` prefers goal slots, `--seconds N` exits after N s
 

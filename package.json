@@ -14,7 +14,8 @@
     "verify:ping": "tsx scripts/verify-ping.ts",
     "verify:sandbox": "tsx scripts/verify-sandbox.ts",
     "bot": "npm run bot -w @puck/server --",
-    "verify:room": "tsx scripts/verify-room.ts"
+    "verify:room": "tsx scripts/verify-room.ts",
+    "verify:netcode": "tsx scripts/verify-netcode.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

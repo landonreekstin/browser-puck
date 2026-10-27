@@ -27,13 +27,20 @@ export type ClientMessage =
   | { t: "pickSlot"; slot: SlotId | null }
   | { t: "start" }
   | { t: "stop" }
-  | { t: "input"; input: PieceInput };
+  /** One entry per client sim tick, in order; seq increases by 1 per tick (M4). */
+  | { t: "input"; inputs: TickInput[] };
+
+export interface TickInput {
+  seq: number;
+  input: PieceInput;
+}
 
 export type ServerMessage =
   | { t: "pong"; id: number; clientTime: number }
   | { t: "welcome"; room: string; playerId: string; token: string }
   | { t: "room"; room: RoomState }
-  | { t: "snapshot"; world: World }
+  /** acks: slot → seq of the last input the server applied for that slot's player. */
+  | { t: "snapshot"; world: World; acks: Record<string, number> }
   | { t: "error"; message: string };
 
 export function encode(msg: ClientMessage | ServerMessage): string {
@@ -94,8 +101,16 @@ export function decodeClientMessage(raw: string): ClientMessage | undefined {
     case "stop":
       return { t: m.t };
     case "input": {
-      const input = decodeInput(m.input);
-      return input ? { t: "input", input } : undefined;
+      if (!Array.isArray(m.inputs) || m.inputs.length > 16) return undefined;
+      const inputs: TickInput[] = [];
+      for (const entry of m.inputs as unknown[]) {
+        const e = entry as Record<string, unknown> | null;
+        if (typeof e !== "object" || e === null || !isNum(e.seq)) return undefined;
+        const input = decodeInput(e.input);
+        if (!input) return undefined;
+        inputs.push({ seq: e.seq, input });
+      }
+      return { t: "input", inputs };
     }
     default:
       return undefined;

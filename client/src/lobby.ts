@@ -45,6 +45,7 @@ export class Lobby {
   /** The entry screen: pick a name, create or join. */
   renderEntry(): void {
     this.root.hidden = false;
+    this.root.classList.remove("docked");
     const name = el("input", { id: "name", value: this.name, maxLength: this.cfg.room.nameMaxLength, placeholder: "your name" });
     const code = el("input", { id: "code", value: this.initialCode, maxLength: 4, placeholder: "CODE" });
     const create = el("button", { id: "create", textContent: "Create room" });
@@ -71,6 +72,8 @@ export class Lobby {
     const isHost = room.hostId === myId;
     this.endButton.hidden = !(isHost && room.phase === "playing");
     this.root.hidden = room.phase === "playing" && me?.slot != null;
+    // Spectators during a match: a small panel in the corner, so they can watch.
+    this.root.classList.toggle("docked", room.phase === "playing");
     if (this.root.hidden) return;
 
     const link = `${location.origin}${location.pathname}?room=${room.code}`;

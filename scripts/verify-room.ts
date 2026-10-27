@@ -12,9 +12,6 @@ if (!executablePath) throw new Error("CHROMIUM_PATH is not set — run inside `n
 
 type Vec = { x: number; y: number };
 interface WorldView { goalies: unknown[]; blockers: unknown[]; puck: { heldBy: number | null } }
-declare global {
-  interface Window { __puck: { world: () => unknown; toScreen: (p: Vec) => Vec } }
-}
 
 mkdirSync("screenshots", { recursive: true });
 const browser = await chromium.launch({ executablePath });

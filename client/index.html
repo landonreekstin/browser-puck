@@ -49,6 +49,12 @@
       #lobby .dim, #lobby .dim a { color: #8b949e; }
       #lobby .error { color: #ff7b72; min-height: 1.2em; }
       #end-match { position: fixed; top: 10px; right: 10px; }
+      #lobby.docked {
+        top: auto; left: auto; right: 10px; bottom: 36px; transform: none;
+        width: min(440px, calc(100vw - 32px)); padding: 12px; font-size: 12px; opacity: 0.92;
+      }
+      #lobby.docked h1 { font-size: 15px; margin-bottom: 6px; }
+      #lobby.docked .row:first-of-type { display: none; }
     </style>
   </head>
   <body>

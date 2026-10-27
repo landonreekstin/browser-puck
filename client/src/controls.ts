@@ -6,7 +6,6 @@ import {
   type PieceInput,
   type Team,
   type Vec,
-  type World,
 } from "@puck/shared";
 import type { View } from "./view";
 
@@ -86,8 +85,11 @@ export class Controls {
     return launchFromDrag(sub(this.view.toWorld(this.pointer), this.dragStart), this.getCfg());
   }
 
-  /** This tick's input for the driven piece (null if none). */
-  collect(dt: number, world: World): PieceInput | null {
+  /**
+   * This tick's input for the driven piece (null if none). `barAngle` is the bar's current
+   * angle (predicted, online), used to keep the rotate target from running away.
+   */
+  collect(dt: number, barAngle: number | null): PieceInput | null {
     const piece = this.piece;
     if (!piece) return null;
     const pointerWorld = this.view.toWorld(this.pointer);
@@ -100,14 +102,13 @@ export class Controls {
       return input;
     }
 
-    const bar = world.blockers.find((b) => b.id === piece.id);
-    if (!bar) return { target: pointerWorld };
-    let target = this.targetAngle ?? bar.angle;
+    if (barAngle === null) return { target: pointerWorld };
+    let target = this.targetAngle ?? barAngle;
     const rotate = (this.keys.has("e") ? 1 : 0) - (this.keys.has("q") ? 1 : 0);
     target += rotate * this.getCfg().bar.rotateSpeed * dt + this.wheelSteps * (Math.PI / 12);
     this.wheelSteps = 0;
     // Don't let the target run more than a quarter turn ahead of the bar.
-    target = bar.angle + Math.max(-Math.PI / 2, Math.min(Math.PI / 2, target - bar.angle));
+    target = barAngle + Math.max(-Math.PI / 2, Math.min(Math.PI / 2, target - barAngle));
     this.targetAngle = target;
     return { target: pointerWorld, targetAngle: target };
   }

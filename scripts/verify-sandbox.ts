@@ -30,9 +30,6 @@ async function moveTo(page: Page, p: Vec, steps = 10): Promise<void> {
   await page.mouse.move(s.x, s.y, { steps });
 }
 
-declare global {
-  interface Window { __puck: { world: () => unknown; toScreen: (p: Vec) => Vec } }
-}
 
 try {
   await page.goto(`${url}/?sandbox`);
